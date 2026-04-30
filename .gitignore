@@ -1,0 +1,30 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.venv/
+*.egg
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Editor swap files
+*.swp
+*.swo
+*~
+
+# Output files
+comparison.md
+*.generated.md
+reports/
+
+# Data caches and backups
+.model_cache/
+
+# macOS
+.DS_Store
+
+# Superpowers session artifacts
+.superpowers/

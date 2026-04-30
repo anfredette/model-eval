@@ -1,0 +1,23 @@
+{%- macro render_table(table) -%}
+{%- if table.rows %}
+| {{ table.headers | join(' | ') }} |
+|{% for a in (table.alignments or (['left'] * table.headers|length)) %}{% if a == 'right' %} ---:|{% elif a == 'center' %} :---:|{% else %} ------|{% endif %}{% endfor %}
+
+{% for row in table.rows -%}
+| {{ row | join(' | ') }} |
+{% endfor %}
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro render_h2h(h2h) -%}
+| Category | {{ h2h.model_a }} | {{ h2h.model_b }} | Delta | Winner |
+| ---------|{% for _ in range(4) %} ------:|{% endfor %}
+
+{% for i in range(h2h.dimensions|length) -%}
+{%- set d = h2h.deltas[i] -%}
+{%- set winner = h2h.model_a if d > 0 else (h2h.model_b if d < 0 else 'Tie') -%}
+{%- set fmt_delta = '+%.1f'|format(d) if d > 0 else '%.1f'|format(d) -%}
+{%- set bold = (d|abs > 25) -%}
+| {{ h2h.dimensions[i] }} | {{ '%.1f'|format(h2h.a_scores[i]) }} | {{ '%.1f'|format(h2h.b_scores[i]) }} | {% if bold %}**{{ fmt_delta }}**{% else %}{{ fmt_delta }}{% endif %} | {{ winner }} |
+{% endfor -%}
+{%- endmacro -%}
