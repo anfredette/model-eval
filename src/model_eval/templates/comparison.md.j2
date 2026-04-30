@@ -1,0 +1,125 @@
+{% from "macros.j2" import render_table, render_h2h %}
+# Model Comparison: {{ model_names | join(' vs ') }}
+
+**Date:** {{ date }}
+
+{{ introduction }}
+
+{% if sources|length > 1 -%}
+| Section | Models Found | Evaluation Method |
+|----------|-------------------------------------------------------------------------------------|-------------------|
+{% for s in sources -%}
+| [Part {{ loop.index }}: {{ s.source_name }}](#part-{{ loop.index }}-{{ s.source_name | lower | replace(' ', '-') }}) | {{ s.models_found | join(', ') or 'None' }} | {{ s.source_description }} |
+{% if not loop.last %}| | | |
+{% endif %}
+{%- endfor %}
+{% endif %}
+{% if overall_conclusions %}
+
+# Overall Conclusions
+
+{% for c in overall_conclusions %}
+{{ loop.index }}. {{ c }}
+{% endfor %}
+{% endif %}
+---
+{% for source in sources %}
+
+# Part {{ loop.index }}: {{ source.source_name }}
+
+**Source:** {{ source.source_name }}
+{% if source.match_details %}
+
+> **Note:** Some model names were resolved by approximate matching:
+{% for user_name, matched_name in source.match_details.items() %}
+> - "{{ user_name }}" matched to **{{ matched_name }}**
+{% endfor %}
+{% endif %}
+{% if source.models_not_found %}
+
+> **Note:** The following models were not found in this source: {{ source.models_not_found | join(', ') }}
+{% for name, similar in source.suggestions.items() %}
+> - "{{ name }}" — did you mean: {{ similar | join(', ') }}?
+{% endfor %}
+{% endif %}
+
+## About {{ source.source_name }}
+
+{{ source.methodology }}
+
+{% if source.models_found -%}
+**Models evaluated:** {{ source.models_found | join(', ') }}
+{% endif %}
+
+---
+{% if source.global_rankings %}
+{% if source.chart_path %}
+
+```{=latex}
+\newpage
+```
+{% endif %}
+
+## {{ source.global_rankings[0].title }}
+{% if source.chart_path %}
+
+![{{ source.source_name }} Distribution]({{ source.chart_path }})\
+{% endif %}
+
+{{ render_table(source.global_rankings[0]) }}
+
+---
+{% endif %}
+{% for table in source.comparison_tables %}
+
+## {{ table.title }}
+
+{{ render_table(table) }}
+{% endfor %}
+{% if source.head_to_heads %}
+{% for h2h in source.head_to_heads %}
+
+## Head-to-Head: {{ h2h.model_a }} vs {{ h2h.model_b }}
+
+{{ h2h.model_a }} wins {{ h2h.a_wins }} of {{ h2h.dimensions|length }} categories{% if h2h.ties %}, {{ h2h.ties }} tied{% endif %}.
+
+{{ render_h2h(h2h) }}
+{% endfor %}
+{% endif %}
+
+---
+
+## {{ source.source_name }} Key Findings
+
+{% for f in source.findings %}
+{{ loop.index }}. {{ f }}
+{% endfor %}
+
+---
+{% endfor %}
+
+---
+
+## Definitions
+
+### Model Tiers
+
+Tiers are based on absolute rank within each data source:
+
+| Tier | Rank Range |
+|------|-----------|
+| Frontier | 1–10 |
+| Near-frontier | 11–25 |
+| Upper-mid | 26–75 |
+| Mid-tier | 76–150 |
+| Long-tail | 151+ |
+
+### Gap Significance
+
+**Arena** — uses per-model confidence intervals (CI). If CIs overlap, the models are "statistically indistinguishable." If CIs don't overlap but the closest bounds are within 20 points, the difference is "small but statistically significant." A gap of 20+ points between closest bounds indicates "clear separation."
+
+**Artificial Analysis** — uses gap relative to population standard deviation. A gap below 0.5 stdev is "not clearly distinguishable," 0.5–1.0 stdev indicates a "moderate difference," and above 1.0 stdev indicates "clear separation."
+
+---
+
+Data provided by *Artificial Analysis* ([https://artificialanalysis.ai](https://artificialanalysis.ai/)) and *Arena* ([https://lmarena.ai](https://lmarena.ai/)).
