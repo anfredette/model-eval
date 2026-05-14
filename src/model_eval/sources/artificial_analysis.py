@@ -442,10 +442,10 @@ def _compute_findings(
                 f"{lower_m.name} at {lower_m.math_index} ({gap} points, {gap_desc})."
             )
 
-        if a_best.speed_tps is not None and b_best.speed_tps is not None:
+        if a_best.speed_tps and b_best.speed_tps:
             faster = a_best if a_best.speed_tps > b_best.speed_tps else b_best
             slower = b_best if faster == a_best else a_best
-            assert faster.speed_tps is not None and slower.speed_tps is not None
+            assert faster.speed_tps and slower.speed_tps
             ratio = faster.speed_tps / slower.speed_tps
             qualifier = _ratio_qualifier(ratio)
             explanation = ""
@@ -464,10 +464,10 @@ def _compute_findings(
                 f"({faster.speed_tps:.0f} vs {slower.speed_tps:.0f} t/s).{explanation}"
             )
 
-        if a_best.ttft_s is not None and b_best.ttft_s is not None:
+        if a_best.ttft_s and b_best.ttft_s:
             faster_ttft = a_best if a_best.ttft_s < b_best.ttft_s else b_best
             slower_ttft = b_best if faster_ttft == a_best else a_best
-            assert slower_ttft.ttft_s is not None and faster_ttft.ttft_s is not None
+            assert slower_ttft.ttft_s and faster_ttft.ttft_s
             ratio = slower_ttft.ttft_s / faster_ttft.ttft_s
             qualifier = _ratio_qualifier(ratio)
             findings.append(
@@ -475,10 +475,10 @@ def _compute_findings(
                 f"({faster_ttft.ttft_s:.2f}s vs {slower_ttft.ttft_s:.2f}s)."
             )
 
-        if a_best.blended_price is not None and b_best.blended_price is not None:
+        if a_best.blended_price and b_best.blended_price:
             cheaper = a_best if a_best.blended_price < b_best.blended_price else b_best
             pricier = b_best if cheaper == a_best else a_best
-            assert pricier.blended_price is not None and cheaper.blended_price is not None
+            assert pricier.blended_price and cheaper.blended_price
             ratio = pricier.blended_price / cheaper.blended_price
             qualifier = _ratio_qualifier(ratio)
             findings.append(
