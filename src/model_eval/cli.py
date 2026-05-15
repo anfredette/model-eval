@@ -38,6 +38,10 @@ def generate_output_path(model_names: list[str]) -> Path:
             parts.append(tokens[1] if len(tokens) > 1 else tokens[0])
 
     prefix = "_".join(sorted(set(parts)))
+    prefix = re.sub(r"[^\w.]", "_", prefix.lower())
+    prefix = re.sub(r"_+", "_", prefix).strip("_")
+    if len(prefix) > 50:
+        prefix = prefix[:50].rsplit("_", 1)[0]
     today = date.today().strftime("%Y_%m_%d")
     base = f"{prefix}_{today}"
 
