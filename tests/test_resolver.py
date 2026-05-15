@@ -98,3 +98,9 @@ class TestResolveModelNames:
     def test_preserves_user_name(self) -> None:
         results = resolve_model_names(["gpt-4o-2024-11-20"], KNOWN)
         assert results[0].user_name == "gpt-4o-2024-11-20"
+
+    def test_reordered_tokens(self) -> None:
+        known = ["qwen2.5 coder instruct 32b"]
+        results = resolve_model_names(["qwen2.5-coder-32b-instruct"], known)
+        assert results[0].match_type == MatchType.EQUIVALENT
+        assert results[0].matched_name == "qwen2.5 coder instruct 32b"

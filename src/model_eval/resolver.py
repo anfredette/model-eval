@@ -28,6 +28,10 @@ def _normalize_punctuation(s: str) -> str:
     return re.sub(r"[\s\-_]", "", s).lower()
 
 
+def _sorted_tokens(s: str) -> tuple[str, ...]:
+    return tuple(sorted(re.findall(r"[a-z0-9]+(?:\.[a-z0-9]+)*", s.lower())))
+
+
 def _strip_org(s: str) -> str:
     return s.split("/", 1)[-1] if "/" in s else s
 
@@ -102,6 +106,10 @@ def resolve_model_names(
     for k in known_names:
         org_stripped_punct_map.setdefault(_normalize_punctuation(_strip_org(k)), k)
 
+    token_map: dict[tuple[str, ...], str] = {}
+    for k in known_names:
+        token_map.setdefault(_sorted_tokens(_strip_org(k)), k)
+
     results: list[MatchResult] = []
     for name in user_names:
         result = _resolve_one(
@@ -112,6 +120,7 @@ def resolve_model_names(
             punct_map,
             org_stripped_lower_map,
             org_stripped_punct_map,
+            token_map,
         )
         results.append(result)
     return results
@@ -125,6 +134,7 @@ def _resolve_one(
     punct_map: dict[str, str],
     org_stripped_lower_map: dict[str, str],
     org_stripped_punct_map: dict[str, str],
+    token_map: dict[tuple[str, ...], str],
 ) -> MatchResult:
     # 1. Exact
     if name in known_set:
@@ -162,7 +172,12 @@ def _resolve_one(
     if hit:
         return MatchResult(name, hit, MatchType.EQUIVALENT)
 
-    # 6. Version-adjacent
+    # 6. Token-set (order-independent match)
+    hit = token_map.get(_sorted_tokens(_strip_org(name)))
+    if hit:
+        return MatchResult(name, hit, MatchType.EQUIVALENT)
+
+    # 7. Version-adjacent
     user_parsed = _parse_version(name)
     if user_parsed:
         user_base, user_ver, _ = user_parsed
@@ -181,7 +196,7 @@ def _resolve_one(
         if best_match is not None:
             return MatchResult(name, best_match, MatchType.FUZZY)
 
-    # 7. Normalized substring
+    # 8. Normalized substring
     norm_name = _normalize(name)
     if norm_name:
         for known in known_names:
