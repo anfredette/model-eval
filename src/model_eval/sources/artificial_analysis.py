@@ -50,6 +50,13 @@ class AAModel(BaseModel):
     intelligence_index: int | None = None
     coding_index: int | None = None
     math_index: int | None = None
+    mmlu_pro: float | None = None
+    gpqa: float | None = None
+    hle: float | None = None
+    livecodebench: float | None = None
+    scicode: float | None = None
+    math_500: float | None = None
+    aime: float | None = None
     speed_tps: float | None = None
     ttft_s: float | None = None
     input_price_per_1m: float | None = None
