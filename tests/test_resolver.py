@@ -104,3 +104,49 @@ class TestResolveModelNames:
         results = resolve_model_names(["qwen2.5-coder-32b-instruct"], known)
         assert results[0].match_type == MatchType.EQUIVALENT
         assert results[0].matched_name == "qwen2.5 coder instruct 32b"
+
+    def test_suffix_stripped_fp8(self) -> None:
+        known = ["Llama-3.1-8B"]
+        results = resolve_model_names(["Llama-3.1-8B-Instruct-FP8"], known)
+        assert results[0].match_type == MatchType.EQUIVALENT
+        assert results[0].matched_name == "Llama-3.1-8B"
+
+    def test_suffix_stripped_quantized(self) -> None:
+        known = ["Qwen2.5-7B"]
+        results = resolve_model_names(["Qwen2.5-7B-Instruct-quantized.w4a16"], known)
+        assert results[0].match_type == MatchType.EQUIVALENT
+        assert results[0].matched_name == "Qwen2.5-7B"
+
+    def test_suffix_stripped_instruct(self) -> None:
+        known = ["Llama-3.1-70B"]
+        results = resolve_model_names(["Llama-3.1-70B-Instruct"], known)
+        assert results[0].match_type == MatchType.EQUIVALENT
+        assert results[0].matched_name == "Llama-3.1-70B"
+
+    def test_suffix_stripped_reasoning(self) -> None:
+        known = ["Qwen3-8B"]
+        results = resolve_model_names(["Qwen3-8B-reasoning"], known)
+        assert results[0].match_type == MatchType.EQUIVALENT
+        assert results[0].matched_name == "Qwen3-8B"
+
+    def test_token_filtering_quant_variants_match(self) -> None:
+        known = ["Llama 3.1 8B FP8-dynamic"]
+        results = resolve_model_names(["Llama-3.1-8B-FP8"], known)
+        assert results[0].match_type == MatchType.EQUIVALENT
+
+    def test_token_filtering_date_suffix_ignored(self) -> None:
+        known = ["Llama-3.1-8B-Instruct-2501"]
+        results = resolve_model_names(["Llama-3.1-8B-Instruct-2503"], known)
+        assert results[0].match_type == MatchType.EQUIVALENT
+
+    def test_size_aware_prefers_same_size(self) -> None:
+        known = ["Granite Code 8B", "Granite Code 70B"]
+        results = resolve_model_names(["granite-code-8b-tuned"], known)
+        assert results[0].match_type == MatchType.FUZZY
+        assert results[0].matched_name == "Granite Code 8B"
+
+    def test_size_aware_prefers_70b(self) -> None:
+        known = ["Granite Code 8B", "Granite Code 70B"]
+        results = resolve_model_names(["granite-code-70b-tuned"], known)
+        assert results[0].match_type == MatchType.FUZZY
+        assert results[0].matched_name == "Granite Code 70B"
