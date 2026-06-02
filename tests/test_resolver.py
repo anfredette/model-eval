@@ -105,6 +105,17 @@ class TestResolveModelNames:
         assert results[0].match_type == MatchType.EQUIVALENT
         assert results[0].matched_name == "qwen2.5 coder instruct 32b"
 
+    def test_reversed_numeric_tokens_not_equivalent(self) -> None:
+        known = ["claude-opus-4-6"]
+        results = resolve_model_names(["claude-opus-6-4"], known)
+        assert results[0].match_type != MatchType.EQUIVALENT
+
+    def test_dot_dash_equivalence(self) -> None:
+        known = ["claude-opus-4-6"]
+        results = resolve_model_names(["claude opus 4.6"], known)
+        assert results[0].match_type == MatchType.EQUIVALENT
+        assert results[0].matched_name == "claude-opus-4-6"
+
     def test_suffix_stripped_fp8(self) -> None:
         known = ["Llama-3.1-8B"]
         results = resolve_model_names(["Llama-3.1-8B-Instruct-FP8"], known)
