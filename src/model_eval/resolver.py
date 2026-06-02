@@ -49,14 +49,25 @@ def _normalize_punctuation(s: str) -> str:
     return re.sub(r"[\s\-_]", "", s).lower()
 
 
+def _normalize_separators(s: str) -> str:
+    """Normalize all separators and alpha-digit boundaries to dashes."""
+    s = re.sub(r"[\s\-_.]", "-", s).lower()
+    s = re.sub(r"(?<=[a-z])(?=\d)", "-", s)
+    s = re.sub(r"(?<=\d)(?=[a-z])", "-", s)
+    return re.sub(r"-+", "-", s)
+
+
 def _sorted_tokens(s: str) -> tuple[str, ...]:
     raw = re.findall(r"[a-z0-9]+(?:\.[a-z0-9]+)*", s.lower())
-    return tuple(sorted(
+    filtered = [
         t for t in raw
         if t not in _QUANT_TOKENS
         and not t.startswith("quantized")
         and not _DATE_SUFFIX_RE.match(t)
-    ))
+    ]
+    alpha = sorted(t for t in filtered if not t.isdigit())
+    numeric = [t for t in filtered if t.isdigit()]
+    return (*alpha, *numeric)
 
 
 def _strip_org(s: str) -> str:
@@ -155,6 +166,10 @@ def resolve_model_names(
     for k in known_names:
         token_map.setdefault(_sorted_tokens(_strip_org(k)), k)
 
+    separator_map: dict[str, str] = {}
+    for k in known_names:
+        separator_map.setdefault(_normalize_separators(_strip_org(k)), k)
+
     suffix_stripped_lower_map: dict[str, str] = {}
     for k in known_names:
         suffix_stripped_lower_map.setdefault(_strip_suffixes(_strip_org(k)).lower(), k)
@@ -176,6 +191,7 @@ def resolve_model_names(
             org_stripped_lower_map,
             org_stripped_punct_map,
             token_map,
+            separator_map,
             suffix_stripped_lower_map,
             suffix_stripped_token_map,
         )
@@ -192,6 +208,7 @@ def _resolve_one(
     org_stripped_lower_map: dict[str, str],
     org_stripped_punct_map: dict[str, str],
     token_map: dict[tuple[str, ...], str],
+    separator_map: dict[str, str],
     suffix_stripped_lower_map: dict[str, str],
     suffix_stripped_token_map: dict[tuple[str, ...], str],
 ) -> MatchResult:
@@ -231,23 +248,28 @@ def _resolve_one(
     if hit:
         return MatchResult(name, hit, MatchType.EQUIVALENT)
 
-    # 6. Token-set (order-independent match, filters quant/date tokens)
+    # 6. Separator-normalized (dots, dashes, underscores, spaces treated as equivalent)
+    hit = separator_map.get(_normalize_separators(_strip_org(name)))
+    if hit:
+        return MatchResult(name, hit, MatchType.EQUIVALENT)
+
+    # 7. Token-set (order-independent match, filters quant/date tokens)
     hit = token_map.get(_sorted_tokens(_strip_org(name)))
     if hit:
         return MatchResult(name, hit, MatchType.EQUIVALENT)
 
-    # 7. Suffix-stripped + case-insensitive
+    # 8. Suffix-stripped + case-insensitive
     user_base = _strip_suffixes(_strip_org(name))
     hit = suffix_stripped_lower_map.get(user_base.lower())
     if hit:
         return MatchResult(name, hit, MatchType.EQUIVALENT)
 
-    # 8. Suffix-stripped + token-set
+    # 9. Suffix-stripped + token-set
     hit = suffix_stripped_token_map.get(_sorted_tokens(user_base))
     if hit:
         return MatchResult(name, hit, MatchType.EQUIVALENT)
 
-    # 9. Size-aware partial word match (only when input has a parameter size like 8B, 70B)
+    # 10. Size-aware partial word match (only when input has a parameter size like 8B, 70B)
     user_words = set(re.findall(r"[a-z0-9]+(?:\.[a-z0-9]+)*", _strip_org(name).lower()))
     user_sizes = _extract_sizes(name)
     if user_sizes and len(user_words) >= 2:
@@ -274,7 +296,7 @@ def _resolve_one(
         if best_match is not None:
             return MatchResult(name, best_match, MatchType.FUZZY)
 
-    # 10. Version-adjacent
+    # 11. Version-adjacent
     user_parsed = _parse_version(name)
     if user_parsed:
         user_ver_base, user_ver, _ = user_parsed
@@ -293,7 +315,7 @@ def _resolve_one(
         if best_match is not None:
             return MatchResult(name, best_match, MatchType.FUZZY)
 
-    # 11. Normalized substring
+    # 12. Normalized substring
     norm_name = _normalize(name)
     if norm_name:
         for known in known_names:
