@@ -32,6 +32,13 @@ CATEGORY_MAP: dict[str, tuple[str | None, str | None]] = {
         None,
     ),
     "industry_medicine_and_healthcare": ("industry_medicine_and_healthcare", None),
+    "mmlu_pro": (None, "mmlu_pro"),
+    "gpqa": (None, "gpqa"),
+    "hle": (None, "hle"),
+    "livecodebench": (None, "livecodebench"),
+    "scicode": (None, "scicode"),
+    "math_500": (None, "math_500"),
+    "aime": (None, "aime"),
     "english": ("english", None),
     "chinese": ("chinese", None),
     "french": ("french", None),
@@ -57,6 +64,13 @@ DEFAULT_CATEGORIES: list[str] = [
     "industry_life_and_physical_and_social_science",
     "industry_mathematical",
     "industry_writing_and_literature_and_language",
+    "mmlu_pro",
+    "gpqa",
+    "hle",
+    "livecodebench",
+    "scicode",
+    "math_500",
+    "aime",
 ]
 
 ALL_CATEGORIES: list[str] = list(CATEGORY_MAP.keys())
@@ -81,6 +95,13 @@ DISPLAY_NAMES: dict[str, str] = {
     "industry_business_and_management_and_financial_operations": "Business & Finance",
     "industry_entertainment_and_sports_and_media": "Entertainment & Media",
     "industry_medicine_and_healthcare": "Medicine & Health",
+    "mmlu_pro": "MMLU-Pro",
+    "gpqa": "GPQA Diamond",
+    "hle": "Humanity's Last Exam",
+    "livecodebench": "LiveCodeBench",
+    "scicode": "SciCode",
+    "math_500": "MATH-500",
+    "aime": "AIME",
     "english": "English",
     "chinese": "Chinese",
     "french": "French",
@@ -96,4 +117,15 @@ def display_name(category: str) -> str:
     return DISPLAY_NAMES.get(category, category)
 
 
-AA_INDEX_FIELDS: list[str] = ["intelligence_index", "coding_index", "math_index"]
+AA_INDEX_FIELDS: list[str] = [
+    "intelligence_index",
+    "coding_index",
+    "math_index",
+    "mmlu_pro",
+    "gpqa",
+    "hle",
+    "livecodebench",
+    "scicode",
+    "math_500",
+    "aime",
+]

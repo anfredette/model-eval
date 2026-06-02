@@ -42,8 +42,8 @@ class TestCategoryMap:
         expected = {"overall", "coding", "math", "creative_writing", "instruction_following"}
         assert expected.issubset(set(DEFAULT_CATEGORIES))
 
-    def test_all_categories_has_27_entries(self):
-        assert len(ALL_CATEGORIES) == 27
+    def test_all_categories_has_34_entries(self):
+        assert len(ALL_CATEGORIES) == 34
 
 
 class TestDisplayName:
