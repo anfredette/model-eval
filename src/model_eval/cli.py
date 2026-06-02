@@ -266,6 +266,180 @@ def sync_arena(verbose: bool) -> None:
     click.echo(f"Synced {count} rows to {cache_path}")
 
 
+@main.command("scores")
+@click.option(
+    "--models",
+    "-m",
+    required=True,
+    help="Comma-separated model names to score.",
+)
+@click.option(
+    "--weights",
+    "-w",
+    default="50/50",
+    help="Arena/AA weight ratio (default: 50/50).",
+)
+@click.option(
+    "--all-categories",
+    is_flag=True,
+    default=False,
+    help="Show all categories (default: key categories only).",
+)
+@click.option(
+    "--fuzzy",
+    is_flag=True,
+    default=False,
+    help="Accept fuzzy model name matches.",
+)
+@click.option("--verbose", "-v", is_flag=True, help="Verbose output.")
+def scores_command(
+    models: str,
+    weights: str,
+    all_categories: bool,
+    fuzzy: bool,
+    verbose: bool,
+) -> None:
+    """Show normalized and composite scores for models across sources."""
+    from rich.console import Console
+    from rich.table import Table
+
+    from model_eval.categories import ALL_CATEGORIES, DEFAULT_CATEGORIES, display_name
+    from model_eval.resolver import MatchType, resolve_model_names
+    from model_eval.scoring import compute_scorecards
+
+    logging.basicConfig(
+        level=logging.DEBUG if verbose else logging.INFO,
+        format="%(levelname)s: %(message)s",
+    )
+
+    model_names = [m.strip() for m in models.split(",") if m.strip()]
+    if not model_names:
+        raise click.UsageError("No model names provided.")
+
+    parts = weights.split("/")
+    if len(parts) != 2:
+        raise click.UsageError("Weights must be in format 'arena/aa', e.g., '60/40'.")
+    try:
+        arena_w, aa_w = float(parts[0]), float(parts[1])
+    except ValueError as e:
+        raise click.UsageError("Weights must be numeric, e.g., '60/40'.") from e
+    total = arena_w + aa_w
+    if total == 0:
+        raise click.UsageError("Weights cannot both be zero.")
+    arena_weight = arena_w / total
+    aa_weight = aa_w / total
+
+    arena_rows, arena_fetched = arena_client.load_cache()
+    aa_models, aa_fetched = aa_client.load_cache()
+
+    if not arena_rows and not aa_models:
+        raise click.ClickException(
+            "No cached data. Run 'model-eval sync-arena' and/or 'model-eval sync-aa' first."
+        )
+
+    arena_names = list({r["model_name"] for r in arena_rows if r.get("category") == "overall"})
+    aa_names = [m["name"] for m in aa_models]
+
+    target_models: list[tuple[str, str | None, str | None]] = []
+    for name in model_names:
+        arena_match: str | None = None
+        aa_match: str | None = None
+
+        if arena_names:
+            results = resolve_model_names([name], arena_names)
+            mr = results[0]
+            if mr.match_type in (MatchType.EXACT, MatchType.EQUIVALENT) or (
+                fuzzy and mr.match_type == MatchType.FUZZY and mr.matched_name
+            ):
+                arena_match = mr.matched_name
+
+        if aa_names:
+            results = resolve_model_names([name], aa_names)
+            mr = results[0]
+            if mr.match_type in (MatchType.EXACT, MatchType.EQUIVALENT) or (
+                fuzzy and mr.match_type == MatchType.FUZZY and mr.matched_name
+            ):
+                aa_match = mr.matched_name
+
+        if not arena_match and not aa_match:
+            click.echo(f'Warning: "{name}" not found in either source.', err=True)
+            continue
+
+        target_models.append((name, arena_match, aa_match))
+
+    if not target_models:
+        raise click.ClickException("No models found in any source.")
+
+    categories = ALL_CATEGORIES if all_categories else DEFAULT_CATEGORIES
+
+    scorecards = compute_scorecards(
+        arena_rows=arena_rows,
+        aa_models=aa_models,
+        target_models=target_models,
+        categories=categories,
+        arena_weight=arena_weight,
+        aa_weight=aa_weight,
+    )
+
+    console = Console()
+
+    prov_labels = {"both": "B", "arena_only": "A", "aa_only": "AA", "none": "?"}
+
+    summary = Table(
+        title=f"Model Scores (Arena {arena_w:.0f}% / AA {aa_w:.0f}%)",
+        show_lines=True,
+    )
+    summary.add_column("Model", style="bold")
+    summary.add_column("Arena Raw", justify="right")
+    summary.add_column("AA Raw", justify="right")
+    summary.add_column("Arena %ile", justify="right")
+    summary.add_column("AA %ile", justify="right")
+    summary.add_column("Composite", justify="right")
+
+    for sc in scorecards:
+        ov = sc.overall
+        if not ov:
+            summary.add_row(sc.model_name, "--", "--", "--", "--", "--")
+            continue
+        a_raw = f"{ov.arena_score.raw_score:.1f}" if ov.arena_score else "--"
+        aa_raw = f"{ov.aa_score.raw_score:.0f}" if ov.aa_score else "--"
+        a_pct = f"{ov.arena_score.percentile:.1f}" if ov.arena_score else "--"
+        aa_pct = f"{ov.aa_score.percentile:.1f}" if ov.aa_score else "--"
+        prov = prov_labels.get(ov.provenance, "?")
+        comp = f"{ov.percentile:.1f} [{prov}]"
+        summary.add_row(sc.model_name, a_raw, aa_raw, a_pct, aa_pct, comp)
+
+    console.print(summary)
+
+    for sc in scorecards:
+        if not sc.categories:
+            continue
+        cat_table = Table(
+            title=f"Category Scores: {sc.model_name}",
+            show_lines=True,
+        )
+        cat_table.add_column("Category", style="bold")
+        cat_table.add_column("Arena Raw", justify="right")
+        cat_table.add_column("AA Raw", justify="right")
+        cat_table.add_column("Arena %ile", justify="right")
+        cat_table.add_column("AA %ile", justify="right")
+        cat_table.add_column("Composite", justify="right")
+
+        for cat in categories:
+            cs = sc.categories.get(cat)
+            if not cs:
+                continue
+            a_raw = f"{cs.arena_score.raw_score:.1f}" if cs.arena_score else "--"
+            aa_raw = f"{cs.aa_score.raw_score:.0f}" if cs.aa_score else "--"
+            a_pct = f"{cs.arena_score.percentile:.1f}" if cs.arena_score else "--"
+            aa_pct = f"{cs.aa_score.percentile:.1f}" if cs.aa_score else "--"
+            prov = prov_labels.get(cs.provenance, "?")
+            comp = f"{cs.percentile:.1f} [{prov}]"
+            cat_table.add_row(display_name(cat), a_raw, aa_raw, a_pct, aa_pct, comp)
+
+        console.print(cat_table)
+
+
 @main.command("check")
 @click.option(
     "--models",

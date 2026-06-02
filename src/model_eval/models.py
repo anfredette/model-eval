@@ -93,3 +93,36 @@ class ComparisonResult:
     model_names: list[str]
     sources: list[SourceData] = field(default_factory=list)
     overall_conclusions: list[str] = field(default_factory=list)
+
+
+@dataclass
+class NormalizedScore:
+    """A model's normalized score in a single category from a single source."""
+
+    raw_score: float
+    percentile: float
+    tied_rank: int
+    population_size: int
+    source: str
+
+
+@dataclass
+class CompositeScore:
+    """A model's composite score in a single category."""
+
+    category: str
+    percentile: float
+    arena_score: NormalizedScore | None
+    aa_score: NormalizedScore | None
+    provenance: str
+
+
+@dataclass
+class ModelScorecard:
+    """Complete scoring profile for a single model."""
+
+    model_name: str
+    arena_name: str | None
+    aa_name: str | None
+    overall: CompositeScore | None
+    categories: dict[str, CompositeScore] = field(default_factory=dict)
