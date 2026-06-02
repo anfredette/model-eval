@@ -304,6 +304,7 @@ def scores_command(
     from rich.table import Table
 
     from model_eval.categories import ALL_CATEGORIES, DEFAULT_CATEGORIES, display_name
+    from model_eval.models import NormalizedScore
     from model_eval.resolver import MatchType, resolve_model_names
     from model_eval.scoring import compute_scorecards
 
@@ -341,13 +342,17 @@ def scores_command(
     aa_names = [m["name"] for m in aa_models]
 
     target_models: list[tuple[str, str | None, str | None]] = []
+    fuzzy_notices: list[str] = []
     for name in model_names:
         arena_match: str | None = None
         aa_match: str | None = None
+        arena_match_type: MatchType = MatchType.NONE
+        aa_match_type: MatchType = MatchType.NONE
 
         if arena_names:
             results = resolve_model_names([name], arena_names)
             mr = results[0]
+            arena_match_type = mr.match_type
             if mr.match_type in (MatchType.EXACT, MatchType.EQUIVALENT) or (
                 fuzzy and mr.match_type == MatchType.FUZZY and mr.matched_name
             ):
@@ -356,6 +361,7 @@ def scores_command(
         if aa_names:
             results = resolve_model_names([name], aa_names)
             mr = results[0]
+            aa_match_type = mr.match_type
             if mr.match_type in (MatchType.EXACT, MatchType.EQUIVALENT) or (
                 fuzzy and mr.match_type == MatchType.FUZZY and mr.matched_name
             ):
@@ -364,6 +370,11 @@ def scores_command(
         if not arena_match and not aa_match:
             click.echo(f'Warning: "{name}" not found in either source.', err=True)
             continue
+
+        if arena_match and arena_match_type == MatchType.FUZZY:
+            fuzzy_notices.append(f'  "{name}" -> "{arena_match}" (fuzzy match in Arena)')
+        if aa_match and aa_match_type == MatchType.FUZZY:
+            fuzzy_notices.append(f'  "{name}" -> "{aa_match}" (fuzzy match in AA)')
 
         target_models.append((name, arena_match, aa_match))
 
@@ -383,10 +394,24 @@ def scores_command(
 
     console = Console()
 
+    if fuzzy_notices:
+        console.print("[yellow]Fuzzy matches used:[/yellow]")
+        for notice in fuzzy_notices:
+            console.print(f"[yellow]{notice}[/yellow]")
+        console.print()
+
+    def fmt_aa_raw(score: NormalizedScore | None) -> str:
+        if not score:
+            return "--"
+        v = score.raw_score
+        if v == int(v) and v >= 2:
+            return f"{v:.0f}"
+        return f"{v:.3f}"
+
     prov_labels = {"both": "B", "arena_only": "A", "aa_only": "AA", "none": "?"}
 
     summary = Table(
-        title=f"Model Scores (Arena {arena_w:.0f}% / AA {aa_w:.0f}%)",
+        title=f"Overall (Arena {arena_w:.0f}% / AA {aa_w:.0f}%)",
         show_lines=True,
     )
     summary.add_column("Model", style="bold")
@@ -402,7 +427,7 @@ def scores_command(
             summary.add_row(sc.model_name, "--", "--", "--", "--", "--")
             continue
         a_raw = f"{ov.arena_score.raw_score:.1f}" if ov.arena_score else "--"
-        aa_raw = f"{ov.aa_score.raw_score:.0f}" if ov.aa_score else "--"
+        aa_raw = fmt_aa_raw(ov.aa_score)
         a_pct = f"{ov.arena_score.percentile:.1f}" if ov.arena_score else "--"
         aa_pct = f"{ov.aa_score.percentile:.1f}" if ov.aa_score else "--"
         prov = prov_labels.get(ov.provenance, "?")
@@ -411,33 +436,66 @@ def scores_command(
 
     console.print(summary)
 
-    for sc in scorecards:
-        if not sc.categories:
-            continue
-        cat_table = Table(
-            title=f"Category Scores: {sc.model_name}",
-            show_lines=True,
-        )
-        cat_table.add_column("Category", style="bold")
-        cat_table.add_column("Arena Raw", justify="right")
-        cat_table.add_column("AA Raw", justify="right")
-        cat_table.add_column("Arena %ile", justify="right")
-        cat_table.add_column("AA %ile", justify="right")
-        cat_table.add_column("Composite", justify="right")
-
+    if len(scorecards) > 1:
         for cat in categories:
-            cs = sc.categories.get(cat)
-            if not cs:
+            if cat == "overall":
                 continue
-            a_raw = f"{cs.arena_score.raw_score:.1f}" if cs.arena_score else "--"
-            aa_raw = f"{cs.aa_score.raw_score:.0f}" if cs.aa_score else "--"
-            a_pct = f"{cs.arena_score.percentile:.1f}" if cs.arena_score else "--"
-            aa_pct = f"{cs.aa_score.percentile:.1f}" if cs.aa_score else "--"
-            prov = prov_labels.get(cs.provenance, "?")
-            comp = f"{cs.percentile:.1f} [{prov}]"
-            cat_table.add_row(display_name(cat), a_raw, aa_raw, a_pct, aa_pct, comp)
+            has_data = any(cat in sc.categories for sc in scorecards)
+            if not has_data:
+                continue
+            cat_table = Table(
+                title=display_name(cat),
+                show_lines=True,
+            )
+            cat_table.add_column("Model", style="bold")
+            cat_table.add_column("Arena Raw", justify="right")
+            cat_table.add_column("AA Raw", justify="right")
+            cat_table.add_column("Arena %ile", justify="right")
+            cat_table.add_column("AA %ile", justify="right")
+            cat_table.add_column("Composite", justify="right")
 
-        console.print(cat_table)
+            for sc in scorecards:
+                cs = sc.categories.get(cat)
+                if not cs:
+                    cat_table.add_row(sc.model_name, "--", "--", "--", "--", "--")
+                    continue
+                a_raw = f"{cs.arena_score.raw_score:.1f}" if cs.arena_score else "--"
+                aa_raw = fmt_aa_raw(cs.aa_score)
+                a_pct = f"{cs.arena_score.percentile:.1f}" if cs.arena_score else "--"
+                aa_pct = f"{cs.aa_score.percentile:.1f}" if cs.aa_score else "--"
+                prov = prov_labels.get(cs.provenance, "?")
+                comp = f"{cs.percentile:.1f} [{prov}]"
+                cat_table.add_row(sc.model_name, a_raw, aa_raw, a_pct, aa_pct, comp)
+
+            console.print(cat_table)
+    else:
+        for sc in scorecards:
+            if not sc.categories:
+                continue
+            cat_table = Table(
+                title=f"Category Scores: {sc.model_name}",
+                show_lines=True,
+            )
+            cat_table.add_column("Category", style="bold")
+            cat_table.add_column("Arena Raw", justify="right")
+            cat_table.add_column("AA Raw", justify="right")
+            cat_table.add_column("Arena %ile", justify="right")
+            cat_table.add_column("AA %ile", justify="right")
+            cat_table.add_column("Composite", justify="right")
+
+            for cat in categories:
+                cs = sc.categories.get(cat)
+                if not cs:
+                    continue
+                a_raw = f"{cs.arena_score.raw_score:.1f}" if cs.arena_score else "--"
+                aa_raw = fmt_aa_raw(cs.aa_score)
+                a_pct = f"{cs.arena_score.percentile:.1f}" if cs.arena_score else "--"
+                aa_pct = f"{cs.aa_score.percentile:.1f}" if cs.aa_score else "--"
+                prov = prov_labels.get(cs.provenance, "?")
+                comp = f"{cs.percentile:.1f} [{prov}]"
+                cat_table.add_row(display_name(cat), a_raw, aa_raw, a_pct, aa_pct, comp)
+
+            console.print(cat_table)
 
 
 @main.command("check")
