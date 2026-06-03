@@ -426,6 +426,18 @@ def scores_command(
             return f"{v:.0f}"
         return f"{v:.3f}"
 
+    def fmt_pct(score: NormalizedScore | None) -> str:
+        if not score:
+            return "--"
+        star = "*" if score.adjustment else ""
+        return f"{score.percentile:.1f}{star}"
+
+    adjustment_notes: list[str] = []
+
+    def collect_adjustment(score: NormalizedScore | None, model_name: str, source: str) -> None:
+        if score and score.adjustment:
+            adjustment_notes.append(f"  {model_name} ({source}): {score.adjustment}")
+
     prov_labels = {"both": "B", "arena_only": "A", "aa_only": "AA", "none": "?"}
 
     summary = Table(
@@ -446,11 +458,13 @@ def scores_command(
             continue
         a_raw = f"{ov.arena_score.raw_score:.1f}" if ov.arena_score else "--"
         aa_raw = fmt_aa_raw(ov.aa_score)
-        a_pct = f"{ov.arena_score.percentile:.1f}" if ov.arena_score else "--"
-        aa_pct = f"{ov.aa_score.percentile:.1f}" if ov.aa_score else "--"
+        a_pct = fmt_pct(ov.arena_score)
+        aa_pct = fmt_pct(ov.aa_score)
         prov = prov_labels.get(ov.provenance, "?")
         comp = f"{ov.percentile:.1f} [{prov}]"
         summary.add_row(sc.model_name, a_raw, aa_raw, a_pct, aa_pct, comp)
+        collect_adjustment(ov.arena_score, sc.model_name, "Arena")
+        collect_adjustment(ov.aa_score, sc.model_name, "AA")
 
     console.print(summary)
 
@@ -479,8 +493,8 @@ def scores_command(
                     continue
                 a_raw = f"{cs.arena_score.raw_score:.1f}" if cs.arena_score else "--"
                 aa_raw = fmt_aa_raw(cs.aa_score)
-                a_pct = f"{cs.arena_score.percentile:.1f}" if cs.arena_score else "--"
-                aa_pct = f"{cs.aa_score.percentile:.1f}" if cs.aa_score else "--"
+                a_pct = fmt_pct(cs.arena_score)
+                aa_pct = fmt_pct(cs.aa_score)
                 prov = prov_labels.get(cs.provenance, "?")
                 comp = f"{cs.percentile:.1f} [{prov}]"
                 cat_table.add_row(sc.model_name, a_raw, aa_raw, a_pct, aa_pct, comp)
@@ -507,13 +521,20 @@ def scores_command(
                     continue
                 a_raw = f"{cs.arena_score.raw_score:.1f}" if cs.arena_score else "--"
                 aa_raw = fmt_aa_raw(cs.aa_score)
-                a_pct = f"{cs.arena_score.percentile:.1f}" if cs.arena_score else "--"
-                aa_pct = f"{cs.aa_score.percentile:.1f}" if cs.aa_score else "--"
+                a_pct = fmt_pct(cs.arena_score)
+                aa_pct = fmt_pct(cs.aa_score)
                 prov = prov_labels.get(cs.provenance, "?")
                 comp = f"{cs.percentile:.1f} [{prov}]"
                 cat_table.add_row(display_name(cat), a_raw, aa_raw, a_pct, aa_pct, comp)
 
             console.print(cat_table)
+
+    if adjustment_notes:
+        seen = set()
+        unique = [n for n in adjustment_notes if n not in seen and not seen.add(n)]  # type: ignore[func-returns-value]
+        console.print("\n[italic]* Estimated scores:[/italic]")
+        for note in unique:
+            console.print(f"[italic]{note}[/italic]")
 
 
 @main.command("check")
