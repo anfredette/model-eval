@@ -19,18 +19,16 @@ _SUFFIXES_TO_STRIP = [
     "-fp8",
     "-quantized.w4a16",
     "-quantized.w8a8",
-    "-instruct-2501",
-    "-instruct-2503",
-    "-instruct-2509",
-    "-instruct-2512",
     "-instruct-hf",
     "-instruct-v0.1",
     "-instruct",
     "-reasoning",
 ]
 
+_INSTRUCT_DATE_RE = re.compile(r"-instruct-\d{4}$", re.IGNORECASE)
+
 _QUANT_TOKENS = frozenset({"fp8", "dynamic", "nvfp4", "hf"})
-_DATE_SUFFIX_RE = re.compile(r"^2\d{3}$")
+_DATE_SUFFIX_RE = re.compile(r"^2[4-9](?:0[1-9]|1[0-2])$")
 _SIZE_RE = re.compile(r"\b(\d+(?:\.\d+)?[bB])\b")
 
 
@@ -85,6 +83,11 @@ def _strip_suffixes(s: str) -> str:
                 result = result[: len(result) - len(suffix)].rstrip("-").strip()
                 changed = True
                 break
+        if not changed:
+            m = _INSTRUCT_DATE_RE.search(result)
+            if m:
+                result = result[: m.start()].rstrip("-").strip()
+                changed = True
     return result
 
 
@@ -258,16 +261,17 @@ def _resolve_one(
     if hit:
         return MatchResult(name, hit, MatchType.EQUIVALENT)
 
-    # 8. Suffix-stripped + case-insensitive
+    # 8. Suffix-stripped + case-insensitive (FUZZY: stripping changes model identity)
     user_base = _strip_suffixes(_strip_org(name))
-    hit = suffix_stripped_lower_map.get(user_base.lower())
-    if hit:
-        return MatchResult(name, hit, MatchType.EQUIVALENT)
+    if user_base.lower() != _strip_org(name).lower():
+        hit = suffix_stripped_lower_map.get(user_base.lower())
+        if hit:
+            return MatchResult(name, hit, MatchType.FUZZY)
 
-    # 9. Suffix-stripped + token-set
-    hit = suffix_stripped_token_map.get(_sorted_tokens(user_base))
-    if hit:
-        return MatchResult(name, hit, MatchType.EQUIVALENT)
+        # 9. Suffix-stripped + token-set
+        hit = suffix_stripped_token_map.get(_sorted_tokens(user_base))
+        if hit:
+            return MatchResult(name, hit, MatchType.FUZZY)
 
     # 10. Size-aware partial word match (only when input has a parameter size like 8B, 70B)
     user_words = set(re.findall(r"[a-z0-9]+(?:\.[a-z0-9]+)*", _strip_org(name).lower()))
@@ -293,7 +297,7 @@ def _resolve_one(
                 best_match = known
                 best_common = len(common)
                 best_has_size = has_size
-        if best_match is not None:
+        if best_match is not None and best_has_size:
             return MatchResult(name, best_match, MatchType.FUZZY)
 
     # 11. Version-adjacent
