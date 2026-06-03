@@ -104,6 +104,8 @@ class NormalizedScore:
     tied_rank: int
     population_size: int
     source: str
+    confidence: float = 1.0
+    adjustment: str | None = None
 
 
 @dataclass

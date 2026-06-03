@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import statistics
 from collections import defaultdict
 from collections.abc import Callable
@@ -7,6 +8,7 @@ from typing import Any
 
 from model_eval.categories import CATEGORY_MAP
 from model_eval.models import CompositeScore, ModelScorecard, NormalizedScore
+from model_eval.variants import detect_variant_delta
 
 
 def _group_by_ties(
@@ -140,6 +142,19 @@ def compute_composite(
     )
 
 
+def _apply_variant_adjustment(
+    score: NormalizedScore, user_name: str, matched_name: str
+) -> NormalizedScore:
+    factor, description = detect_variant_delta(user_name, matched_name)
+    if description is None:
+        return score
+    adjusted = copy.copy(score)
+    adjusted.raw_score = round(score.raw_score * factor, 3)
+    adjusted.confidence = 0.8
+    adjusted.adjustment = description
+    return adjusted
+
+
 def compute_scorecards(
     arena_rows: list[dict[str, Any]],
     aa_models: list[dict[str, Any]],
@@ -170,6 +185,10 @@ def compute_scorecards(
         for cat in categories:
             a_score = arena_norms.get(cat, {}).get(arena_name) if arena_name else None
             aa_score = aa_norms.get(cat, {}).get(aa_name) if aa_name else None
+            if a_score and arena_name:
+                a_score = _apply_variant_adjustment(a_score, display_name, arena_name)
+            if aa_score and aa_name:
+                aa_score = _apply_variant_adjustment(aa_score, display_name, aa_name)
             if a_score or aa_score:
                 cat_scores[cat] = compute_composite(
                     cat, a_score, aa_score, arena_weight, aa_weight
