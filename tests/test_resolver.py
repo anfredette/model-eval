@@ -161,3 +161,24 @@ class TestResolveModelNames:
         results = resolve_model_names(["granite-code-70b-tuned"], known)
         assert results[0].match_type == MatchType.FUZZY
         assert results[0].matched_name == "Granite Code 70B"
+
+    def test_family_mismatch_no_fuzzy(self) -> None:
+        known = ["mistral-7b-instruct-v0.2"]
+        results = resolve_model_names(["qwen2.5-7b-instruct"], known)
+        assert results[0].match_type == MatchType.NONE
+
+    def test_family_mismatch_granite_llama(self) -> None:
+        known = ["Llama 3.1 Instruct 8B"]
+        results = resolve_model_names(["granite-3.1-8b-instruct"], known)
+        assert results[0].match_type == MatchType.NONE
+
+    def test_subset_token_match(self) -> None:
+        known = ["Llama 4 Scout"]
+        results = resolve_model_names(["llama-4-scout-17b-16e-instruct"], known)
+        assert results[0].match_type == MatchType.FUZZY
+        assert results[0].matched_name == "Llama 4 Scout"
+
+    def test_subset_token_prefers_most_specific(self) -> None:
+        known = ["Qwen3 8B", "Qwen3 8B (Reasoning)"]
+        results = resolve_model_names(["qwen3-8b-reasoning"], known)
+        assert results[0].matched_name is not None
