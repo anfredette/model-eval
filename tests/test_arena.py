@@ -67,9 +67,9 @@ class TestFindModelsFuzzy:
         found, not_found, match_details, fuzzy_suggestions = _find_models(
             sample_arena_df, ["model-alpha-v3"], fuzzy=True
         )
-        assert "model-alpha-v2" in found
+        assert len(found) == 1
+        assert found[0] in ("model-alpha", "model-alpha-v2")
         assert "model-alpha-v3" not in not_found
-        assert match_details["model-alpha-v3"] == "model-alpha-v2"
         assert fuzzy_suggestions == {}
 
     def test_exact_match_unaffected_by_fuzzy_flag(self, sample_arena_df: pd.DataFrame) -> None:

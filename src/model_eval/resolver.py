@@ -95,6 +95,16 @@ def _extract_sizes(s: str) -> set[str]:
     return {m.lower() for m in _SIZE_RE.findall(s)}
 
 
+_FAMILY_RE = re.compile(r"[a-z]+", re.IGNORECASE)
+
+
+def _extract_family(s: str) -> str | None:
+    """Extract the model family name — the first alphabetic token after org stripping."""
+    name = _strip_org(s).lower()
+    m = _FAMILY_RE.match(name)
+    return m.group(0) if m else None
+
+
 _VERSION_RE = re.compile(
     r"^(?P<base>.+?)"
     r"[.\-_]?"
@@ -273,14 +283,34 @@ def _resolve_one(
         if hit:
             return MatchResult(name, hit, MatchType.FUZZY)
 
-    # 10. Size-aware partial word match (only when input has a parameter size like 8B, 70B)
+    # 10. Subset token match (known name's tokens all appear in user input)
+    user_family = _extract_family(name)
+    user_token_set = set(_sorted_tokens(_strip_org(name)))
+    if user_family and len(user_token_set) >= 2:
+        best_match: str | None = None
+        best_token_count = 1
+        for known in known_names:
+            if _extract_family(known) != user_family:
+                continue
+            known_token_set = set(_sorted_tokens(_strip_org(known)))
+            if len(known_token_set) < 2:
+                continue
+            if known_token_set <= user_token_set and len(known_token_set) > best_token_count:
+                best_match = known
+                best_token_count = len(known_token_set)
+        if best_match is not None:
+            return MatchResult(name, best_match, MatchType.FUZZY)
+
+    # 11. Size-aware partial word match (requires matching family and parameter size)
     user_words = set(re.findall(r"[a-z0-9]+(?:\.[a-z0-9]+)*", _strip_org(name).lower()))
     user_sizes = _extract_sizes(name)
-    if user_sizes and len(user_words) >= 2:
-        best_match: str | None = None
+    if user_family and user_sizes and len(user_words) >= 2:
+        best_match = None
         best_common = 0
         best_has_size = False
         for known in known_names:
+            if _extract_family(known) != user_family:
+                continue
             known_words = set(
                 re.findall(r"[a-z0-9]+(?:\.[a-z0-9]+)*", _strip_org(known).lower())
             )
@@ -288,7 +318,7 @@ def _resolve_one(
             if len(common) < 2:
                 continue
             known_sizes = _extract_sizes(known)
-            has_size = bool(user_sizes and user_sizes & known_sizes)
+            has_size = bool(user_sizes & known_sizes)
             if has_size and not best_has_size:
                 best_match = known
                 best_common = len(common)
@@ -300,7 +330,7 @@ def _resolve_one(
         if best_match is not None and best_has_size:
             return MatchResult(name, best_match, MatchType.FUZZY)
 
-    # 11. Version-adjacent
+    # 12. Version-adjacent (requires matching family via parsed base)
     user_parsed = _parse_version(name)
     if user_parsed:
         user_ver_base, user_ver, _ = user_parsed
@@ -319,10 +349,12 @@ def _resolve_one(
         if best_match is not None:
             return MatchResult(name, best_match, MatchType.FUZZY)
 
-    # 12. Normalized substring
+    # 13. Normalized substring (requires matching family)
     norm_name = _normalize(name)
-    if norm_name:
+    if norm_name and user_family:
         for known in known_names:
+            if _extract_family(known) != user_family:
+                continue
             if norm_name in _normalize(known):
                 return MatchResult(name, known, MatchType.FUZZY)
 
