@@ -68,8 +68,26 @@ def _sorted_tokens(s: str) -> tuple[str, ...]:
     return (*alpha, *numeric)
 
 
+# Org names baked into model names with a dash (e.g., "meta-llama-3.1-8b"
+# instead of "meta-llama/llama-3.1-8b"). Stripped after slash-based org
+# removal so family extraction finds the model name, not the vendor.
+# Review when adding new models: check Arena/AA data and planner catalog
+# for names starting with vendor prefixes.
+_ORG_PREFIXES = [
+    "amazon-",
+    "ibm-",
+    "meta-",
+    "nvidia-",
+]
+
+
 def _strip_org(s: str) -> str:
-    return s.split("/", 1)[-1] if "/" in s else s
+    result = s.split("/", 1)[-1] if "/" in s else s
+    lower = result.lower()
+    for prefix in _ORG_PREFIXES:
+        if lower.startswith(prefix):
+            return result[len(prefix):]
+    return result
 
 
 def _strip_suffixes(s: str) -> str:
