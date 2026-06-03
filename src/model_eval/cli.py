@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import re
 import shutil
@@ -21,6 +22,22 @@ from model_eval.resolver import MatchType, suggest_similar
 from model_eval.sources import get_available_sources, get_source
 
 REPORTS_DIR = Path("reports")
+
+
+def _load_catalog_models(path: str) -> list[str]:
+    with open(path) as f:
+        data = json.load(f)
+    if isinstance(data, dict) and "models" in data:
+        return [m["model_id"] for m in data["models"] if "model_id" in m]
+    raise click.UsageError(f"Expected JSON with a 'models' array containing 'model_id' fields: {path}")
+
+
+def _get_model_names(models: str | None, catalog: str | None) -> list[str]:
+    if catalog:
+        return _load_catalog_models(catalog)
+    if models:
+        return [m.strip() for m in models.split(",") if m.strip()]
+    raise click.UsageError("Provide either --models/-m or --catalog.")
 
 
 def generate_output_path(model_names: list[str]) -> Path:
@@ -270,8 +287,14 @@ def sync_arena(verbose: bool) -> None:
 @click.option(
     "--models",
     "-m",
-    required=True,
+    default=None,
     help="Comma-separated model names to score.",
+)
+@click.option(
+    "--catalog",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to a JSON model catalog file (e.g., model_catalog.json).",
 )
 @click.option(
     "--weights",
@@ -293,7 +316,8 @@ def sync_arena(verbose: bool) -> None:
 )
 @click.option("--verbose", "-v", is_flag=True, help="Verbose output.")
 def scores_command(
-    models: str,
+    models: str | None,
+    catalog: str | None,
     weights: str,
     all_categories: bool,
     fuzzy: bool,
@@ -313,9 +337,7 @@ def scores_command(
         format="%(levelname)s: %(message)s",
     )
 
-    model_names = [m.strip() for m in models.split(",") if m.strip()]
-    if not model_names:
-        raise click.UsageError("No model names provided.")
+    model_names = _get_model_names(models, catalog)
 
     parts = weights.split("/")
     if len(parts) != 2:
@@ -498,8 +520,14 @@ def scores_command(
 @click.option(
     "--models",
     "-m",
-    required=True,
+    default=None,
     help="Comma-separated model names to check.",
+)
+@click.option(
+    "--catalog",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to a JSON model catalog file (e.g., model_catalog.json).",
 )
 @click.option(
     "--sources",
@@ -508,16 +536,14 @@ def scores_command(
     help=f"Comma-separated source names. Available: {', '.join(get_available_sources())}",
 )
 @click.option("--verbose", "-v", is_flag=True, help="Verbose output.")
-def check_models(models: str, sources: str | None, verbose: bool) -> None:
+def check_models(models: str | None, catalog: str | None, sources: str | None, verbose: bool) -> None:
     """Check how model names resolve in each data source (no report generated)."""
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
         format="%(levelname)s: %(message)s",
     )
 
-    model_names = [m.strip() for m in models.split(",") if m.strip()]
-    if not model_names:
-        raise click.UsageError("No model names provided.")
+    model_names = _get_model_names(models, catalog)
 
     source_names = (
         [s.strip() for s in sources.split(",") if s.strip()] if sources else get_available_sources()
