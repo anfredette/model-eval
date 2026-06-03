@@ -338,43 +338,39 @@ def scores_command(
             "No cached data. Run 'model-eval sync-arena' and/or 'model-eval sync-aa' first."
         )
 
-    arena_names = list({r["model_name"] for r in arena_rows if r.get("category") == "overall"})
+    arena_names = sorted({r["model_name"] for r in arena_rows if r.get("category") == "overall"})
     aa_names = [m["name"] for m in aa_models]
+
+    arena_results = resolve_model_names(model_names, arena_names) if arena_names else []
+    aa_results = resolve_model_names(model_names, aa_names) if aa_names else []
 
     target_models: list[tuple[str, str | None, str | None]] = []
     fuzzy_notices: list[str] = []
-    for name in model_names:
+    for i, name in enumerate(model_names):
         arena_match: str | None = None
         aa_match: str | None = None
-        arena_match_type: MatchType = MatchType.NONE
-        aa_match_type: MatchType = MatchType.NONE
 
-        if arena_names:
-            results = resolve_model_names([name], arena_names)
-            mr = results[0]
-            arena_match_type = mr.match_type
+        if arena_results:
+            mr = arena_results[i]
             if mr.match_type in (MatchType.EXACT, MatchType.EQUIVALENT) or (
                 fuzzy and mr.match_type == MatchType.FUZZY and mr.matched_name
             ):
                 arena_match = mr.matched_name
+            if arena_match and mr.match_type == MatchType.FUZZY:
+                fuzzy_notices.append(f'  "{name}" -> "{arena_match}" (fuzzy match in Arena)')
 
-        if aa_names:
-            results = resolve_model_names([name], aa_names)
-            mr = results[0]
-            aa_match_type = mr.match_type
+        if aa_results:
+            mr = aa_results[i]
             if mr.match_type in (MatchType.EXACT, MatchType.EQUIVALENT) or (
                 fuzzy and mr.match_type == MatchType.FUZZY and mr.matched_name
             ):
                 aa_match = mr.matched_name
+            if aa_match and mr.match_type == MatchType.FUZZY:
+                fuzzy_notices.append(f'  "{name}" -> "{aa_match}" (fuzzy match in AA)')
 
         if not arena_match and not aa_match:
             click.echo(f'Warning: "{name}" not found in either source.', err=True)
             continue
-
-        if arena_match and arena_match_type == MatchType.FUZZY:
-            fuzzy_notices.append(f'  "{name}" -> "{arena_match}" (fuzzy match in Arena)')
-        if aa_match and aa_match_type == MatchType.FUZZY:
-            fuzzy_notices.append(f'  "{name}" -> "{aa_match}" (fuzzy match in AA)')
 
         target_models.append((name, arena_match, aa_match))
 
@@ -404,7 +400,7 @@ def scores_command(
         if not score:
             return "--"
         v = score.raw_score
-        if v == int(v) and v >= 2:
+        if v == int(v):
             return f"{v:.0f}"
         return f"{v:.3f}"
 
