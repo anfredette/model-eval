@@ -535,8 +535,16 @@ def scores_command(
     default=None,
     help=f"Comma-separated source names. Available: {', '.join(get_available_sources())}",
 )
+@click.option(
+    "--fuzzy",
+    is_flag=True,
+    default=False,
+    help="Accept fuzzy model name matches instead of treating them as not-found.",
+)
 @click.option("--verbose", "-v", is_flag=True, help="Verbose output.")
-def check_models(models: str | None, catalog: str | None, sources: str | None, verbose: bool) -> None:
+def check_models(
+    models: str | None, catalog: str | None, sources: str | None, fuzzy: bool, verbose: bool
+) -> None:
     """Check how model names resolve in each data source (no report generated)."""
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
@@ -566,14 +574,17 @@ def check_models(models: str | None, catalog: str | None, sources: str | None, v
             elif mr.match_type == MatchType.EQUIVALENT:
                 click.echo(f'  "{mr.user_name}" -> {mr.matched_name} (equivalent)')
             elif mr.match_type == MatchType.FUZZY:
-                candidates = [mr.matched_name] if mr.matched_name else []
-                for s in suggest_similar(mr.user_name, report.available_names, n=3):
-                    if s not in candidates:
-                        candidates.append(s)
-                candidates = candidates[:3]
-                click.echo(f'  "{mr.user_name}" -> not found')
-                if candidates:
-                    click.echo(f"    Similar: {', '.join(candidates)}")
+                if fuzzy and mr.matched_name:
+                    click.echo(f'  "{mr.user_name}" -> {mr.matched_name} (fuzzy)')
+                else:
+                    candidates = [mr.matched_name] if mr.matched_name else []
+                    for s in suggest_similar(mr.user_name, report.available_names, n=3):
+                        if s not in candidates:
+                            candidates.append(s)
+                    candidates = candidates[:3]
+                    click.echo(f'  "{mr.user_name}" -> not found')
+                    if candidates:
+                        click.echo(f"    Similar: {', '.join(candidates)}")
             else:
                 suggestions = suggest_similar(mr.user_name, report.available_names, n=3)
                 click.echo(f'  "{mr.user_name}" -> not found')
