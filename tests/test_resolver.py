@@ -119,25 +119,25 @@ class TestResolveModelNames:
     def test_suffix_stripped_fp8(self) -> None:
         known = ["Llama-3.1-8B"]
         results = resolve_model_names(["Llama-3.1-8B-Instruct-FP8"], known)
-        assert results[0].match_type == MatchType.EQUIVALENT
+        assert results[0].match_type == MatchType.FUZZY
         assert results[0].matched_name == "Llama-3.1-8B"
 
     def test_suffix_stripped_quantized(self) -> None:
         known = ["Qwen2.5-7B"]
         results = resolve_model_names(["Qwen2.5-7B-Instruct-quantized.w4a16"], known)
-        assert results[0].match_type == MatchType.EQUIVALENT
+        assert results[0].match_type == MatchType.FUZZY
         assert results[0].matched_name == "Qwen2.5-7B"
 
     def test_suffix_stripped_instruct(self) -> None:
         known = ["Llama-3.1-70B"]
         results = resolve_model_names(["Llama-3.1-70B-Instruct"], known)
-        assert results[0].match_type == MatchType.EQUIVALENT
+        assert results[0].match_type == MatchType.FUZZY
         assert results[0].matched_name == "Llama-3.1-70B"
 
     def test_suffix_stripped_reasoning(self) -> None:
         known = ["Qwen3-8B"]
         results = resolve_model_names(["Qwen3-8B-reasoning"], known)
-        assert results[0].match_type == MatchType.EQUIVALENT
+        assert results[0].match_type == MatchType.FUZZY
         assert results[0].matched_name == "Qwen3-8B"
 
     def test_token_filtering_quant_variants_match(self) -> None:
