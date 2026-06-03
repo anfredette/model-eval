@@ -114,7 +114,16 @@ class CompositeScore:
     percentile: float
     arena_score: NormalizedScore | None
     aa_score: NormalizedScore | None
-    provenance: str
+
+    @property
+    def provenance(self) -> str:
+        if self.arena_score and self.aa_score:
+            return "both"
+        if self.arena_score:
+            return "arena_only"
+        if self.aa_score:
+            return "aa_only"
+        return "none"
 
 
 @dataclass
