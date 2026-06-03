@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import statistics
+from collections import defaultdict
 from collections.abc import Callable
 from typing import Any
 
@@ -46,11 +47,20 @@ def _assign_percentiles(
     return results
 
 
+def _group_rows_by_category(
+    rows: list[dict[str, Any]],
+) -> dict[str, list[dict[str, Any]]]:
+    grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for r in rows:
+        grouped[r.get("category", "")].append(r)
+    return grouped
+
+
 def normalize_arena_category(
     rows: list[dict[str, Any]],
     category: str,
 ) -> dict[str, NormalizedScore]:
-    cat_rows = [r for r in rows if r["category"] == category]
+    cat_rows = [r for r in rows if r.get("category", category) == category]
     if not cat_rows:
         return {}
 
@@ -71,9 +81,9 @@ def normalize_arena_category(
     sorted_pairs = [(name, score) for name, score, _, _ in items]
 
     def are_tied(anchor_name: str, candidate_name: str) -> bool:
-        anchor_lower = ci_lookup[anchor_name][0]
-        candidate_upper = ci_lookup[candidate_name][1]
-        return candidate_upper >= anchor_lower
+        anchor_lower, anchor_upper = ci_lookup[anchor_name]
+        candidate_lower, candidate_upper = ci_lookup[candidate_name]
+        return candidate_upper >= anchor_lower and anchor_upper >= candidate_lower
 
     groups = _group_by_ties(sorted_pairs, are_tied)
     return _assign_percentiles(groups, len(sorted_pairs), "arena")
@@ -115,23 +125,18 @@ def compute_composite(
 ) -> CompositeScore:
     if arena_norm and aa_norm:
         pct = arena_weight * arena_norm.percentile + aa_weight * aa_norm.percentile
-        provenance = "both"
     elif arena_norm:
         pct = arena_norm.percentile
-        provenance = "arena_only"
     elif aa_norm:
         pct = aa_norm.percentile
-        provenance = "aa_only"
     else:
         pct = 0.0
-        provenance = "none"
 
     return CompositeScore(
         category=category,
         percentile=round(pct, 2),
         arena_score=arena_norm,
         aa_score=aa_norm,
-        provenance=provenance,
     )
 
 
@@ -146,11 +151,13 @@ def compute_scorecards(
     arena_norms: dict[str, dict[str, NormalizedScore]] = {}
     aa_norms: dict[str, dict[str, NormalizedScore]] = {}
 
+    arena_by_category = _group_rows_by_category(arena_rows)
+
     for cat in categories:
         arena_cat, aa_field = CATEGORY_MAP.get(cat, (None, None))
 
-        if arena_cat:
-            norms = normalize_arena_category(arena_rows, arena_cat)
+        if arena_cat and arena_cat in arena_by_category:
+            norms = normalize_arena_category(arena_by_category[arena_cat], arena_cat)
             arena_norms[cat] = norms
 
         if aa_field:
