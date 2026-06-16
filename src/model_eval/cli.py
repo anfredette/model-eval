@@ -16,9 +16,9 @@ import model_eval.sources.arena  # noqa: F401
 import model_eval.sources.artificial_analysis  # noqa: F401
 from model_eval import aa_client, arena_client
 from model_eval.charts import generate_distribution_chart
-from model_eval.models import ComparisonResult
+from model_eval.models import ComparisonResult, MatchType
 from model_eval.renderer import render_comparison
-from model_eval.resolver import MatchType, suggest_similar
+from model_eval.resolver import suggest_similar
 from model_eval.sources import get_available_sources, get_source
 
 REPORTS_DIR = Path("reports")
@@ -329,7 +329,7 @@ def scores_command(
 
     from model_eval.categories import ALL_CATEGORIES, DEFAULT_CATEGORIES, display_name
     from model_eval.models import NormalizedScore
-    from model_eval.resolver import MatchType, resolve_model_names
+    from model_eval.resolver import resolve_model_names
     from model_eval.scoring import compute_scorecards
 
     logging.basicConfig(

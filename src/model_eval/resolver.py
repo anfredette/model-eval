@@ -1,16 +1,10 @@
 from __future__ import annotations
 
 import difflib
-import enum
 import re
 from dataclasses import dataclass
 
-
-class MatchType(enum.Enum):
-    EXACT = "exact"
-    EQUIVALENT = "equivalent"
-    FUZZY = "fuzzy"
-    NONE = "none"
+from model_eval.models import MatchType
 
 
 _SUFFIXES_TO_STRIP = [

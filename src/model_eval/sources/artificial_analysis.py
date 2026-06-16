@@ -9,8 +9,14 @@ from typing import Any
 from pydantic import BaseModel
 
 from model_eval import aa_client
-from model_eval.models import ComparisonTable, DistributionStats, ResolutionReport, SourceData
-from model_eval.resolver import MatchResult, MatchType, resolve_model_names, suggest_similar
+from model_eval.models import (
+    ComparisonTable,
+    DistributionStats,
+    MatchType,
+    ResolutionReport,
+    SourceData,
+)
+from model_eval.resolver import MatchResult, resolve_model_names, suggest_similar
 from model_eval.sources import register_source
 from model_eval.tiers import aa_gap_significance, tier_label
 

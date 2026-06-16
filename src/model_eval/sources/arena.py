@@ -11,10 +11,11 @@ from model_eval.models import (
     ComparisonTable,
     DistributionStats,
     HeadToHead,
+    MatchType,
     ResolutionReport,
     SourceData,
 )
-from model_eval.resolver import MatchType, resolve_model_names, suggest_similar
+from model_eval.resolver import resolve_model_names, suggest_similar
 from model_eval.sources import register_source
 from model_eval.tiers import arena_gap_significance, tier_label
 
