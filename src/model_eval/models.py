@@ -1,11 +1,19 @@
 from __future__ import annotations
 
+import enum
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from model_eval.resolver import MatchResult
+
+
+class MatchType(enum.Enum):
+    EXACT = "exact"
+    EQUIVALENT = "equivalent"
+    FUZZY = "fuzzy"
+    NONE = "none"
 
 
 @dataclass
