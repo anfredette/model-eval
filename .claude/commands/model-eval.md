@@ -9,6 +9,7 @@ When the user asks to evaluate or compare models:
    - For specific models: `uv run model-eval -m "model1,model2"`
    - For model families: `uv run model-eval -m "family1,family2" --families`
    - For specific sources only: add `--sources arena` or `--sources artificial_analysis`
+   - For custom weights: add `--weights arena=60,aa=40` (values are pure weights, normalized internally)
    - The CLI auto-generates a report name in `reports/` (e.g., `reports/claude_gpt_2025_05_01_00.md`). Use `-o path` only to override.
    - Do NOT add `--pdf` yet — generate the PDF after adding analysis (see step 7)
 3. Run the command from the model-eval project directory (`/Users/anfredet/go/src/github.com/model-eval/`)
@@ -22,39 +23,35 @@ When the user asks to evaluate or compare models:
 5. Read the generated report file (parse the path from the CLI's "Comparison written to ..." output)
 6. **Enhance the report with analysis** (do not ask for permission — this is what the user is requesting by invoking /model-eval):
 
-   a. **Enhance the Key Findings sections with interpretive prose:**
-      - Read the Arena Key Findings and AA Key Findings sections in the generated file
-      - Rewrite each finding in-place with narrative interpretation, adding:
-        - Context about what the numbers mean practically (e.g., "this places it alongside models like X and Y")
-        - Relative tier placement and what it implies
-        - Implications for deployment decisions (e.g., "well-suited for latency-sensitive applications")
-        - Caveats and limitations worth noting
-      - Keep the same numbered-list format but with richer, more readable prose
+   a. **Enhance the Category Analysis section** — The generated report contains a Category Analysis section with structured findings showing all models' percentiles per category. Rewrite each finding in-place with interpretive prose:
+      - What the percentile gap means practically ("96th percentile in coding places it in the top handful of models globally")
+      - Cross-category patterns ("strong across STEM categories but drops to 88th percentile in creative writing")
+      - Deployment implications ("if your workload is coding-heavy, the 7-percentile composite gap matters")
+      - For 3+ model comparisons, discuss the full ranking — don't just compare top vs bottom
+
+   b. **Enhance the source-level Key Findings** — Read the Arena Key Findings and AA Key Findings sections and rewrite each finding in-place with narrative interpretation. Reference composite percentiles alongside raw scores for context. Keep the same numbered-list format but with richer, more readable prose.
       - Example: transform `**Speed:** X is 2.5x faster (132 vs 52 t/s).` into `**Speed advantage:** X is dramatically faster than comparable Y models: 132 t/s vs 52-55 t/s for the Y 235B variants. This is likely due to X's much smaller active parameter count (13B active vs 22B active) despite having more total parameters.`
 
-   b. **Write an Overall Conclusions section and insert it after the intro/section table (before Part 1).** The template reserves this position. Structure it as:
-      1. **Overall positioning** — Where each model/family sits using standardized tier names (Frontier, Near-frontier, Upper-mid, Mid-tier, Long-tail) with specific rank and score evidence from both Arena and AA
-      2. **Lineup depth** — How broad each family's lineup is (number of models on each platform)
-      3. **Value proposition** — Each side's niche: speed/cost vs quality vs breadth, with specific numbers
-      4. **Quality profile differences** — STEM-leaning vs humanities-leaning, citing specific category deltas from head-to-head data
-      5. **Evaluation coverage** — Note any limitations (different variants evaluated on different platforms, missing data)
-      6. **Summary table** — A markdown table comparing key factors side by side:
+   c. **Write an Overall Conclusions section and insert it after the intro/section table (before Part 1).** The template reserves this position. Structure it as composite-first:
+      1. **Overall positioning** — Lead with composite percentiles and tiers. Raw ranks become supporting evidence.
+      2. **Topic profile** — Characterize each model using Category Analysis data.
+      3. **Cross-source agreement** — Note where Arena and AA agree vs diverge.
+      4. **Confidence and caveats** — Note variant estimations, single-source categories, fuzzy matches.
+      5. **Summary table** — Values are composite percentiles:
 
          | Factor | Model A | Model B |
          |--------|---------|---------|
-         | Top-tier quality | ... | ... |
-         | Same-tier quality | ... | ... |
+         | Composite percentile | ... | ... |
+         | Arena percentile | ... | ... |
+         | AA percentile | ... | ... |
+         | Top category | ... | ... |
+         | Weakest category | ... | ... |
          | Speed | ... | ... |
          | Latency | ... | ... |
          | Price | ... | ... |
-         | Context window | ... | ... |
-         | Strength categories | ... | ... |
-         | Weakness categories | ... | ... |
-         | Model variety | ... | ... |
-         | Open weights | ... | ... |
 
-      7. **Bottom line** — 2-3 sentence prose summary of when to pick each model family
-      - Write the conclusions using the actual data from the report — cite specific numbers, ranks, scores, and category names
+      6. **Bottom line** — 2-3 sentences using percentile language
+      - Write the conclusions using the actual data from the report — cite specific composite percentiles, category scores, and tier placements
 
 7. **Generate PDF if the user requested it** (do not ask for permission — just generate it):
    - Run pandoc AFTER all analysis has been added to the markdown file
@@ -84,20 +81,24 @@ The `--aa-data` flag can override the AA cache with a custom JSON file.
 - "Compare trinity-large-preview with qwen3-235b-a22b"
 - "How does Trinity stack up against Qwen models?" (use --families)
 - "Compare just Arena data for trinity and qwen" (use --sources arena)
+- "Compare with 70/30 Arena weighting" (use --weights arena=70,aa=30)
 - "Sync the AA data" (run sync-aa)
 - "Sync the Arena data" (run sync-arena)
 
 ## Tier and Gap Language
 
-When writing findings and conclusions, use the standardized vocabulary from the report's Definitions section:
+When writing findings and conclusions, use percentile-based vocabulary from the report's Definitions section:
 
-**Tier names** (based on absolute rank): Frontier (1-10), Near-frontier (11-25), Upper-mid (26-75), Mid-tier (76-150), Long-tail (151+). Use these consistently instead of ad-hoc phrases like "top tier" or "upper third."
+**Tier names** (based on composite percentile): Frontier (≥95th), Near-frontier (85th–94th), Upper-mid (50th–84th), Mid-tier (15th–49th), Long-tail (below 15th). Use these consistently instead of ad-hoc phrases.
 
-**Gap significance language:**
+**Gap significance** (composite percentile distance):
+- <5 percentile points: "effectively equivalent"
+- 5–15 percentile points: "moderate advantage"
+- >15 percentile points: "clear separation"
+
+**Source-level language** (used when enhancing per-source Key Findings):
 - Arena: "statistically indistinguishable" / "small but statistically significant difference" / "clear separation" (based on confidence interval overlap)
 - AA: "not clearly distinguishable" / "moderate difference" / "clear separation" (based on population stdev)
-
-Calibrate language about model gaps to the actual distribution. A 42-point Arena gap may sound large but could be only 0.35 stdev — don't overstate it. The generated findings already use these terms; align your prose analysis accordingly.
 
 **Distribution charts** are auto-generated alongside the report (PNG files). No manual action needed — they appear in the report between the About section and Key Findings for each source.
 
