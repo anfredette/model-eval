@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-from model_eval.models import NormalizedScore
+from model_eval.models import (
+    CategoryFinding,
+    ComparisonResult,
+    MatchType,
+    ModelScorecard,
+    NormalizedScore,
+)
 from model_eval.scoring import (
     compute_composite,
     compute_scorecards,
@@ -222,3 +228,75 @@ class TestComputeScorecards:
         result = compute_scorecards(arena_rows, [], targets, ["overall"])
         sc = result[0]
         assert sc.overall is None
+
+
+class TestCategoryFinding:
+    def test_construction(self):
+        f = CategoryFinding(
+            category="coding",
+            display_name="Coding",
+            ranked_models=[("model-a", 96.1), ("model-b", 82.3)],
+            gap_description="clear separation",
+            provenance="both",
+            variant_notes=[],
+        )
+        assert f.category == "coding"
+        assert f.ranked_models[0] == ("model-a", 96.1)
+        assert f.gap_description == "clear separation"
+
+    def test_with_variant_notes(self):
+        f = CategoryFinding(
+            category="overall",
+            display_name="Overall",
+            ranked_models=[("model-a", 94.2), ("model-b", 91.5)],
+            gap_description="effectively equivalent",
+            provenance="both",
+            variant_notes=["model-a: instruct variant (confidence: 0.97)"],
+        )
+        assert len(f.variant_notes) == 1
+
+    def test_three_models(self):
+        f = CategoryFinding(
+            category="overall",
+            display_name="Overall",
+            ranked_models=[("a", 96.0), ("b", 85.0), ("c", 70.0)],
+            gap_description="clear separation",
+            provenance="both",
+            variant_notes=[],
+        )
+        assert len(f.ranked_models) == 3
+        assert f.ranked_models[0][0] == "a"
+        assert f.ranked_models[-1][0] == "c"
+
+
+class TestModelScorecardMatchType:
+    def test_default_match_types_are_none(self):
+        sc = ModelScorecard(
+            model_name="test",
+            arena_name=None,
+            aa_name=None,
+            overall=None,
+        )
+        assert sc.arena_match_type is None
+        assert sc.aa_match_type is None
+
+    def test_match_types_set(self):
+        sc = ModelScorecard(
+            model_name="test",
+            arena_name="test-arena",
+            aa_name="Test AA",
+            arena_match_type=MatchType.EXACT,
+            aa_match_type=MatchType.EQUIVALENT,
+            overall=None,
+        )
+        assert sc.arena_match_type == MatchType.EXACT
+        assert sc.aa_match_type == MatchType.EQUIVALENT
+
+
+class TestComparisonResultNewFields:
+    def test_default_scorecards_empty(self):
+        r = ComparisonResult(model_names=["a"])
+        assert r.scorecards == []
+        assert r.category_findings == []
+        assert r.arena_weight == 0.5
+        assert r.aa_weight == 0.5
