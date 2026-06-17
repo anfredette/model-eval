@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import click
 import pytest
 from click.testing import CliRunner
 
-from model_eval.cli import main
+from model_eval.cli import main, parse_weights
 
 
 @pytest.mark.unit
@@ -50,9 +51,62 @@ class TestCLI:
         assert result.exit_code == 0
         assert "--models" in result.output
 
+    def test_weights_flag_in_help(self) -> None:
+        runner = CliRunner()
+        result = runner.invoke(main, ["--help"])
+        assert result.exit_code == 0
+        assert "--weights" in result.output
+
 
 from model_eval.models import MatchType
 from model_eval.cli import build_scorecards
+
+
+class TestParseWeights:
+    def test_equal_weights(self):
+        arena, aa = parse_weights("arena=50,aa=50")
+        assert arena == 0.5
+        assert aa == 0.5
+
+    def test_unequal_weights(self):
+        arena, aa = parse_weights("arena=3,aa=2")
+        assert arena == pytest.approx(0.6)
+        assert aa == pytest.approx(0.4)
+
+    def test_order_independent(self):
+        arena, aa = parse_weights("aa=40,arena=60")
+        assert arena == pytest.approx(0.6)
+        assert aa == pytest.approx(0.4)
+
+    def test_arbitrary_scale(self):
+        arena, aa = parse_weights("arena=1,aa=1")
+        assert arena == 0.5
+        assert aa == 0.5
+
+    def test_float_values(self):
+        arena, aa = parse_weights("arena=0.7,aa=0.3")
+        assert arena == pytest.approx(0.7)
+        assert aa == pytest.approx(0.3)
+
+    def test_missing_source_raises(self):
+        with pytest.raises(click.UsageError):
+            parse_weights("arena=50")
+
+    def test_unknown_source_raises(self):
+        with pytest.raises(click.UsageError):
+            parse_weights("arena=50,openai=50")
+
+    def test_zero_weight_raises(self):
+        with pytest.raises(click.UsageError):
+            parse_weights("arena=0,aa=0")
+
+    def test_negative_weight_raises(self):
+        with pytest.raises(click.UsageError):
+            parse_weights("arena=-1,aa=50")
+
+    def test_bad_format_raises(self):
+        with pytest.raises(click.UsageError):
+            parse_weights("50/50")
 
 
 class TestBuildScorecards:
