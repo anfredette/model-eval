@@ -334,6 +334,29 @@ def main(
         source_data.chart_path = Path(chart_path.name)
         click.echo(f"Chart written to {chart_path}")
 
+    from model_eval.categories import DEFAULT_CATEGORIES
+    from model_eval.scoring import generate_category_findings
+
+    arena_rows_raw, _ = arena_client.load_cache()
+    aa_models_raw, _ = aa_client.load_cache()
+
+    if arena_rows_raw or aa_models_raw:
+        scorecards = build_scorecards(
+            model_names=model_names,
+            arena_rows=arena_rows_raw,
+            aa_models=aa_models_raw,
+            categories=DEFAULT_CATEGORIES,
+            arena_weight=arena_weight,
+            aa_weight=aa_weight,
+            fuzzy=fuzzy,
+        )
+        result.scorecards = scorecards
+        result.arena_weight = arena_weight
+        result.aa_weight = aa_weight
+        result.category_findings = generate_category_findings(
+            scorecards, DEFAULT_CATEGORIES
+        )
+
     render_comparison(result, output_path)
     click.echo(f"Comparison written to {output_path}")
 
