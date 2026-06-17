@@ -103,25 +103,19 @@ class TestLoadModels:
 @pytest.mark.unit
 class TestMatchModels:
     def test_exact_match(self, sample_aa_models: list[AAModel]) -> None:
-        found, not_found, _, match_details, _ = _match_models(
-            sample_aa_models, ["Alpha Thinking"]
-        )
+        found, not_found, _, match_details, _ = _match_models(sample_aa_models, ["Alpha Thinking"])
         assert len(found) == 1
         assert found[0].name == "Alpha Thinking"
         assert match_details == {}
 
     def test_case_insensitive_match(self, sample_aa_models: list[AAModel]) -> None:
-        found, not_found, _, match_details, _ = _match_models(
-            sample_aa_models, ["alpha thinking"]
-        )
+        found, not_found, _, match_details, _ = _match_models(sample_aa_models, ["alpha thinking"])
         assert len(found) == 1
         assert found[0].name == "Alpha Thinking"
         assert match_details == {}
 
     def test_punctuation_match(self, sample_aa_models: list[AAModel]) -> None:
-        found, not_found, _, match_details, _ = _match_models(
-            sample_aa_models, ["Alpha-Thinking"]
-        )
+        found, not_found, _, match_details, _ = _match_models(sample_aa_models, ["Alpha-Thinking"])
         assert len(found) == 1
         assert found[0].name == "Alpha Thinking"
         assert match_details == {}
@@ -149,9 +143,7 @@ class TestMatchModels:
         assert match_details == {}
 
     def test_family_match(self, sample_aa_models: list[AAModel]) -> None:
-        found, _, family_map, _, _ = _match_models(
-            sample_aa_models, ["Beta"], families=True
-        )
+        found, _, family_map, _, _ = _match_models(sample_aa_models, ["Beta"], families=True)
         assert len(found) == 2
         assert all(family_map[m.name] == "Beta" for m in found)
 
@@ -217,9 +209,7 @@ class TestMatchModelsFuzzy:
                 intelligence_index=20,
             ),
         ]
-        found, not_found, _, match_details, _ = _match_models(
-            models, ["model-x-120b"], fuzzy=False
-        )
+        found, not_found, _, match_details, _ = _match_models(models, ["model-x-120b"], fuzzy=False)
         assert len(found) == 1
         assert found[0].name == "Model X 120B (high)"
         assert not_found == []
@@ -239,9 +229,7 @@ class TestMatchModelsFuzzy:
                 intelligence_index=35,
             ),
         ]
-        _, _, _, _, fuzzy_suggestions = _match_models(
-            models, ["model-x-3.7"], fuzzy=False
-        )
+        _, _, _, _, fuzzy_suggestions = _match_models(models, ["model-x-3.7"], fuzzy=False)
         assert "model-x-3.7" in fuzzy_suggestions
         candidates = fuzzy_suggestions["model-x-3.7"]
         assert len(candidates) <= 3

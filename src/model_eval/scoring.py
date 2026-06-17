@@ -191,9 +191,7 @@ def compute_scorecards(
             if aa_score and aa_name:
                 aa_score = _apply_variant_adjustment(aa_score, display_name_str, aa_name)
             if a_score or aa_score:
-                cat_scores[cat] = compute_composite(
-                    cat, a_score, aa_score, arena_weight, aa_weight
-                )
+                cat_scores[cat] = compute_composite(cat, a_score, aa_score, arena_weight, aa_weight)
 
         overall = cat_scores.get("overall")
         scorecards.append(
@@ -256,13 +254,15 @@ def generate_category_findings(
                         f"{model_name}: {score.adjustment} (confidence: {score.confidence})"
                     )
 
-        findings.append(CategoryFinding(
-            category=cat,
-            display_name=display_name(cat),
-            ranked_models=ranked_models,
-            gap_description=gap_desc,
-            provenance=provenance,
-            variant_notes=variant_notes,
-        ))
+        findings.append(
+            CategoryFinding(
+                category=cat,
+                display_name=display_name(cat),
+                ranked_models=ranked_models,
+                gap_description=gap_desc,
+                provenance=provenance,
+                variant_notes=variant_notes,
+            )
+        )
 
     return findings

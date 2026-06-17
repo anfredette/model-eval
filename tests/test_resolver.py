@@ -82,9 +82,7 @@ class TestResolveModelNames:
         assert results[0].matched_name is None
 
     def test_multiple_names(self) -> None:
-        results = resolve_model_names(
-            ["GPT-4o-2024-11-20", "gpt-4o-2024-11-20", "zzzzz"], KNOWN
-        )
+        results = resolve_model_names(["GPT-4o-2024-11-20", "gpt-4o-2024-11-20", "zzzzz"], KNOWN)
         assert len(results) == 3
         assert results[0].match_type == MatchType.EXACT
         assert results[1].match_type == MatchType.EQUIVALENT

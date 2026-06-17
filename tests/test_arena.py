@@ -35,17 +35,13 @@ class TestFindModels:
         assert match_details == {}
 
     def test_case_insensitive_match(self, sample_arena_df: pd.DataFrame) -> None:
-        found, not_found, match_details, _ = _find_models(
-            sample_arena_df, ["Model-Alpha"]
-        )
+        found, not_found, match_details, _ = _find_models(sample_arena_df, ["Model-Alpha"])
         assert found == ["model-alpha"]
         assert not_found == []
         assert match_details == {}
 
     def test_punctuation_match(self, sample_arena_df: pd.DataFrame) -> None:
-        found, not_found, match_details, _ = _find_models(
-            sample_arena_df, ["model_alpha"]
-        )
+        found, not_found, match_details, _ = _find_models(sample_arena_df, ["model_alpha"])
         assert found == ["model-alpha"]
         assert not_found == []
         assert match_details == {}

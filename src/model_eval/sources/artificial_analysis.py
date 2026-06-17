@@ -148,9 +148,7 @@ def _load_models(data_path: Path | None) -> tuple[list[AAModel], str]:
     return models, status
 
 
-def _try_slug_match(
-    models: list[AAModel], user_name: str
-) -> tuple[AAModel | None, MatchType]:
+def _try_slug_match(models: list[AAModel], user_name: str) -> tuple[AAModel | None, MatchType]:
     slug_names = [m.slug for m in models]
     results = resolve_model_names([user_name], slug_names)
     mr = results[0]
@@ -629,7 +627,6 @@ class ArtificialAnalysisSource:
             distribution_stats=dist_stats,
             chart_models=chart_models,
         )
-
 
     def resolve_names(self, model_names: list[str]) -> ResolutionReport:
         all_models, _ = _load_models(self._data_path)

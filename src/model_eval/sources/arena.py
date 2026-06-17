@@ -746,7 +746,6 @@ class ArenaSource:
             chart_models=chart_models,
         )
 
-
     def resolve_names(self, model_names: list[str]) -> ResolutionReport:
         df, _ = _fetch_arena()
         overall = df[df["category"] == "overall"]

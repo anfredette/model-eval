@@ -20,18 +20,54 @@ from model_eval.scoring import (
 class TestNormalizeArenaCategory:
     def test_basic_ranking(self):
         rows = [
-            {"model_name": "A", "category": "overall", "rating": 1500, "rating_lower": 1495, "rating_upper": 1505},
-            {"model_name": "B", "category": "overall", "rating": 1400, "rating_lower": 1395, "rating_upper": 1405},
-            {"model_name": "C", "category": "overall", "rating": 1300, "rating_lower": 1295, "rating_upper": 1305},
+            {
+                "model_name": "A",
+                "category": "overall",
+                "rating": 1500,
+                "rating_lower": 1495,
+                "rating_upper": 1505,
+            },
+            {
+                "model_name": "B",
+                "category": "overall",
+                "rating": 1400,
+                "rating_lower": 1395,
+                "rating_upper": 1405,
+            },
+            {
+                "model_name": "C",
+                "category": "overall",
+                "rating": 1300,
+                "rating_lower": 1295,
+                "rating_upper": 1305,
+            },
         ]
         result = normalize_arena_category(rows, "overall")
         assert result["A"].percentile > result["B"].percentile > result["C"].percentile
 
     def test_tied_models_via_ci_overlap(self):
         rows = [
-            {"model_name": "A", "category": "overall", "rating": 1500, "rating_lower": 1490, "rating_upper": 1510},
-            {"model_name": "B", "category": "overall", "rating": 1498, "rating_lower": 1488, "rating_upper": 1508},
-            {"model_name": "C", "category": "overall", "rating": 1300, "rating_lower": 1290, "rating_upper": 1310},
+            {
+                "model_name": "A",
+                "category": "overall",
+                "rating": 1500,
+                "rating_lower": 1490,
+                "rating_upper": 1510,
+            },
+            {
+                "model_name": "B",
+                "category": "overall",
+                "rating": 1498,
+                "rating_lower": 1488,
+                "rating_upper": 1508,
+            },
+            {
+                "model_name": "C",
+                "category": "overall",
+                "rating": 1300,
+                "rating_lower": 1290,
+                "rating_upper": 1310,
+            },
         ]
         result = normalize_arena_category(rows, "overall")
         assert result["A"].percentile == result["B"].percentile
@@ -40,16 +76,40 @@ class TestNormalizeArenaCategory:
 
     def test_no_overlap_means_not_tied(self):
         rows = [
-            {"model_name": "A", "category": "overall", "rating": 1500, "rating_lower": 1498, "rating_upper": 1502},
-            {"model_name": "B", "category": "overall", "rating": 1400, "rating_lower": 1398, "rating_upper": 1402},
+            {
+                "model_name": "A",
+                "category": "overall",
+                "rating": 1500,
+                "rating_lower": 1498,
+                "rating_upper": 1502,
+            },
+            {
+                "model_name": "B",
+                "category": "overall",
+                "rating": 1400,
+                "rating_lower": 1398,
+                "rating_upper": 1402,
+            },
         ]
         result = normalize_arena_category(rows, "overall")
         assert result["A"].percentile != result["B"].percentile
 
     def test_filters_by_category(self):
         rows = [
-            {"model_name": "A", "category": "overall", "rating": 1500, "rating_lower": 1495, "rating_upper": 1505},
-            {"model_name": "B", "category": "coding", "rating": 1400, "rating_lower": 1395, "rating_upper": 1405},
+            {
+                "model_name": "A",
+                "category": "overall",
+                "rating": 1500,
+                "rating_lower": 1495,
+                "rating_upper": 1505,
+            },
+            {
+                "model_name": "B",
+                "category": "coding",
+                "rating": 1400,
+                "rating_lower": 1395,
+                "rating_upper": 1405,
+            },
         ]
         result = normalize_arena_category(rows, "overall")
         assert "A" in result
@@ -61,15 +121,33 @@ class TestNormalizeArenaCategory:
 
     def test_single_model(self):
         rows = [
-            {"model_name": "A", "category": "overall", "rating": 1500, "rating_lower": 1495, "rating_upper": 1505},
+            {
+                "model_name": "A",
+                "category": "overall",
+                "rating": 1500,
+                "rating_lower": 1495,
+                "rating_upper": 1505,
+            },
         ]
         result = normalize_arena_category(rows, "overall")
         assert result["A"].percentile == 50.0
 
     def test_population_size_set(self):
         rows = [
-            {"model_name": "A", "category": "overall", "rating": 1500, "rating_lower": 1495, "rating_upper": 1505},
-            {"model_name": "B", "category": "overall", "rating": 1400, "rating_lower": 1395, "rating_upper": 1405},
+            {
+                "model_name": "A",
+                "category": "overall",
+                "rating": 1500,
+                "rating_lower": 1495,
+                "rating_upper": 1505,
+            },
+            {
+                "model_name": "B",
+                "category": "overall",
+                "rating": 1400,
+                "rating_lower": 1395,
+                "rating_upper": 1405,
+            },
         ]
         result = normalize_arena_category(rows, "overall")
         assert result["A"].population_size == 2
@@ -77,7 +155,13 @@ class TestNormalizeArenaCategory:
 
     def test_source_is_arena(self):
         rows = [
-            {"model_name": "A", "category": "overall", "rating": 1500, "rating_lower": 1495, "rating_upper": 1505},
+            {
+                "model_name": "A",
+                "category": "overall",
+                "rating": 1500,
+                "rating_lower": 1495,
+                "rating_upper": 1505,
+            },
         ]
         result = normalize_arena_category(rows, "overall")
         assert result["A"].source == "arena"
@@ -150,20 +234,28 @@ class TestNormalizeAAIndex:
 
 class TestComputeComposite:
     def test_both_sources(self):
-        arena = NormalizedScore(raw_score=1500, percentile=90.0, tied_rank=1, population_size=100, source="arena")
-        aa = NormalizedScore(raw_score=60, percentile=80.0, tied_rank=1, population_size=100, source="aa")
+        arena = NormalizedScore(
+            raw_score=1500, percentile=90.0, tied_rank=1, population_size=100, source="arena"
+        )
+        aa = NormalizedScore(
+            raw_score=60, percentile=80.0, tied_rank=1, population_size=100, source="aa"
+        )
         result = compute_composite("overall", arena, aa)
         assert result.percentile == 85.0
         assert result.provenance == "both"
 
     def test_arena_only(self):
-        arena = NormalizedScore(raw_score=1500, percentile=90.0, tied_rank=1, population_size=100, source="arena")
+        arena = NormalizedScore(
+            raw_score=1500, percentile=90.0, tied_rank=1, population_size=100, source="arena"
+        )
         result = compute_composite("coding", arena, None)
         assert result.percentile == 90.0
         assert result.provenance == "arena_only"
 
     def test_aa_only(self):
-        aa = NormalizedScore(raw_score=60, percentile=80.0, tied_rank=1, population_size=100, source="aa")
+        aa = NormalizedScore(
+            raw_score=60, percentile=80.0, tied_rank=1, population_size=100, source="aa"
+        )
         result = compute_composite("overall", None, aa)
         assert result.percentile == 80.0
         assert result.provenance == "aa_only"
@@ -174,8 +266,12 @@ class TestComputeComposite:
         assert result.provenance == "none"
 
     def test_custom_weights(self):
-        arena = NormalizedScore(raw_score=1500, percentile=100.0, tied_rank=1, population_size=100, source="arena")
-        aa = NormalizedScore(raw_score=60, percentile=0.0, tied_rank=1, population_size=100, source="aa")
+        arena = NormalizedScore(
+            raw_score=1500, percentile=100.0, tied_rank=1, population_size=100, source="arena"
+        )
+        aa = NormalizedScore(
+            raw_score=60, percentile=0.0, tied_rank=1, population_size=100, source="aa"
+        )
         result = compute_composite("overall", arena, aa, arena_weight=0.7, aa_weight=0.3)
         assert result.percentile == 70.0
 
@@ -183,8 +279,20 @@ class TestComputeComposite:
 class TestComputeScorecards:
     def test_basic_scorecard(self):
         arena_rows = [
-            {"model_name": "model-a", "category": "overall", "rating": 1500, "rating_lower": 1495, "rating_upper": 1505},
-            {"model_name": "model-b", "category": "overall", "rating": 1400, "rating_lower": 1395, "rating_upper": 1405},
+            {
+                "model_name": "model-a",
+                "category": "overall",
+                "rating": 1500,
+                "rating_lower": 1495,
+                "rating_upper": 1505,
+            },
+            {
+                "model_name": "model-b",
+                "category": "overall",
+                "rating": 1400,
+                "rating_lower": 1395,
+                "rating_upper": 1405,
+            },
         ]
         aa_models = [
             {"name": "Model A", "intelligence_index": 60},
@@ -200,7 +308,13 @@ class TestComputeScorecards:
 
     def test_arena_only_model(self):
         arena_rows = [
-            {"model_name": "model-a", "category": "overall", "rating": 1500, "rating_lower": 1495, "rating_upper": 1505},
+            {
+                "model_name": "model-a",
+                "category": "overall",
+                "rating": 1500,
+                "rating_lower": 1495,
+                "rating_upper": 1505,
+            },
         ]
         targets = [("Model A", "model-a", None)]
         result = compute_scorecards(arena_rows, [], targets, ["overall"])
@@ -210,8 +324,20 @@ class TestComputeScorecards:
 
     def test_multiple_categories(self):
         arena_rows = [
-            {"model_name": "a", "category": "overall", "rating": 1500, "rating_lower": 1495, "rating_upper": 1505},
-            {"model_name": "a", "category": "coding", "rating": 1480, "rating_lower": 1475, "rating_upper": 1485},
+            {
+                "model_name": "a",
+                "category": "overall",
+                "rating": 1500,
+                "rating_lower": 1495,
+                "rating_upper": 1505,
+            },
+            {
+                "model_name": "a",
+                "category": "coding",
+                "rating": 1480,
+                "rating_lower": 1475,
+                "rating_upper": 1485,
+            },
         ]
         aa_models = [
             {"name": "A", "intelligence_index": 60, "coding_index": 55},
@@ -224,7 +350,13 @@ class TestComputeScorecards:
 
     def test_model_not_in_source(self):
         arena_rows = [
-            {"model_name": "other", "category": "overall", "rating": 1500, "rating_lower": 1495, "rating_upper": 1505},
+            {
+                "model_name": "other",
+                "category": "overall",
+                "rating": 1500,
+                "rating_lower": 1495,
+                "rating_upper": 1505,
+            },
         ]
         targets = [("Missing", None, None)]
         result = compute_scorecards(arena_rows, [], targets, ["overall"])
@@ -307,30 +439,46 @@ class TestComparisonResultNewFields:
 class TestGenerateCategoryFindings:
     def _make_scorecard(self, name, overall_pct, coding_pct=None, provenance="both"):
         arena_score = NormalizedScore(
-            raw_score=1500, percentile=overall_pct, tied_rank=1,
-            population_size=100, source="arena",
+            raw_score=1500,
+            percentile=overall_pct,
+            tied_rank=1,
+            population_size=100,
+            source="arena",
         )
-        aa_score = NormalizedScore(
-            raw_score=60, percentile=overall_pct, tied_rank=1,
-            population_size=100, source="aa",
-        ) if provenance == "both" else None
+        aa_score = (
+            NormalizedScore(
+                raw_score=60,
+                percentile=overall_pct,
+                tied_rank=1,
+                population_size=100,
+                source="aa",
+            )
+            if provenance == "both"
+            else None
+        )
 
         categories = {
             "overall": CompositeScore(
-                category="overall", percentile=overall_pct,
+                category="overall",
+                percentile=overall_pct,
                 arena_score=arena_score,
                 aa_score=aa_score,
             ),
         }
         if coding_pct is not None:
             categories["coding"] = CompositeScore(
-                category="coding", percentile=coding_pct,
-                arena_score=arena_score, aa_score=aa_score,
+                category="coding",
+                percentile=coding_pct,
+                arena_score=arena_score,
+                aa_score=aa_score,
             )
 
         return ModelScorecard(
-            model_name=name, arena_name=name, aa_name=name,
-            overall=categories["overall"], categories=categories,
+            model_name=name,
+            arena_name=name,
+            aa_name=name,
+            overall=categories["overall"],
+            categories=categories,
         )
 
     def test_two_models_one_category(self):
@@ -394,103 +542,168 @@ class TestGenerateCategoryFindings:
 
     def test_provenance_tracked(self):
         arena_only = NormalizedScore(
-            raw_score=1500, percentile=90.0, tied_rank=1,
-            population_size=100, source="arena",
+            raw_score=1500,
+            percentile=90.0,
+            tied_rank=1,
+            population_size=100,
+            source="arena",
         )
         sc_a = ModelScorecard(
-            model_name="a", arena_name="a", aa_name=None,
+            model_name="a",
+            arena_name="a",
+            aa_name=None,
             overall=CompositeScore(
-                category="overall", percentile=90.0,
-                arena_score=arena_only, aa_score=None,
+                category="overall",
+                percentile=90.0,
+                arena_score=arena_only,
+                aa_score=None,
             ),
-            categories={"overall": CompositeScore(
-                category="overall", percentile=90.0,
-                arena_score=arena_only, aa_score=None,
-            )},
+            categories={
+                "overall": CompositeScore(
+                    category="overall",
+                    percentile=90.0,
+                    arena_score=arena_only,
+                    aa_score=None,
+                )
+            },
         )
         sc_b = ModelScorecard(
-            model_name="b", arena_name="b", aa_name=None,
+            model_name="b",
+            arena_name="b",
+            aa_name=None,
             overall=CompositeScore(
-                category="overall", percentile=70.0,
-                arena_score=arena_only, aa_score=None,
+                category="overall",
+                percentile=70.0,
+                arena_score=arena_only,
+                aa_score=None,
             ),
-            categories={"overall": CompositeScore(
-                category="overall", percentile=70.0,
-                arena_score=arena_only, aa_score=None,
-            )},
+            categories={
+                "overall": CompositeScore(
+                    category="overall",
+                    percentile=70.0,
+                    arena_score=arena_only,
+                    aa_score=None,
+                )
+            },
         )
         findings = generate_category_findings([sc_a, sc_b], ["overall"])
         assert findings[0].provenance == "arena_only"
 
     def test_mixed_provenance(self):
         arena_score = NormalizedScore(
-            raw_score=1500, percentile=90.0, tied_rank=1,
-            population_size=100, source="arena",
+            raw_score=1500,
+            percentile=90.0,
+            tied_rank=1,
+            population_size=100,
+            source="arena",
         )
         aa_score = NormalizedScore(
-            raw_score=60, percentile=85.0, tied_rank=1,
-            population_size=100, source="aa",
+            raw_score=60,
+            percentile=85.0,
+            tied_rank=1,
+            population_size=100,
+            source="aa",
         )
         sc_a = ModelScorecard(
-            model_name="a", arena_name="a", aa_name="A",
+            model_name="a",
+            arena_name="a",
+            aa_name="A",
             overall=CompositeScore(
-                category="overall", percentile=90.0,
-                arena_score=arena_score, aa_score=aa_score,
+                category="overall",
+                percentile=90.0,
+                arena_score=arena_score,
+                aa_score=aa_score,
             ),
-            categories={"overall": CompositeScore(
-                category="overall", percentile=90.0,
-                arena_score=arena_score, aa_score=aa_score,
-            )},
+            categories={
+                "overall": CompositeScore(
+                    category="overall",
+                    percentile=90.0,
+                    arena_score=arena_score,
+                    aa_score=aa_score,
+                )
+            },
         )
         sc_b = ModelScorecard(
-            model_name="b", arena_name="b", aa_name=None,
+            model_name="b",
+            arena_name="b",
+            aa_name=None,
             overall=CompositeScore(
-                category="overall", percentile=70.0,
-                arena_score=arena_score, aa_score=None,
+                category="overall",
+                percentile=70.0,
+                arena_score=arena_score,
+                aa_score=None,
             ),
-            categories={"overall": CompositeScore(
-                category="overall", percentile=70.0,
-                arena_score=arena_score, aa_score=None,
-            )},
+            categories={
+                "overall": CompositeScore(
+                    category="overall",
+                    percentile=70.0,
+                    arena_score=arena_score,
+                    aa_score=None,
+                )
+            },
         )
         findings = generate_category_findings([sc_a, sc_b], ["overall"])
         assert findings[0].provenance == "mixed"
 
     def test_variant_notes_included(self):
         adjusted = NormalizedScore(
-            raw_score=1450, percentile=85.0, tied_rank=2,
-            population_size=100, source="arena",
-            confidence=0.8, adjustment="instruct variant",
+            raw_score=1450,
+            percentile=85.0,
+            tied_rank=2,
+            population_size=100,
+            source="arena",
+            confidence=0.8,
+            adjustment="instruct variant",
         )
         sc_a = ModelScorecard(
-            model_name="a", arena_name="a", aa_name=None,
+            model_name="a",
+            arena_name="a",
+            aa_name=None,
             overall=CompositeScore(
-                category="overall", percentile=90.0,
+                category="overall",
+                percentile=90.0,
                 arena_score=NormalizedScore(
-                    raw_score=1500, percentile=90.0, tied_rank=1,
-                    population_size=100, source="arena",
+                    raw_score=1500,
+                    percentile=90.0,
+                    tied_rank=1,
+                    population_size=100,
+                    source="arena",
                 ),
                 aa_score=None,
             ),
-            categories={"overall": CompositeScore(
-                category="overall", percentile=90.0,
-                arena_score=NormalizedScore(
-                    raw_score=1500, percentile=90.0, tied_rank=1,
-                    population_size=100, source="arena",
-                ),
-                aa_score=None,
-            )},
+            categories={
+                "overall": CompositeScore(
+                    category="overall",
+                    percentile=90.0,
+                    arena_score=NormalizedScore(
+                        raw_score=1500,
+                        percentile=90.0,
+                        tied_rank=1,
+                        population_size=100,
+                        source="arena",
+                    ),
+                    aa_score=None,
+                )
+            },
         )
         sc_b = ModelScorecard(
-            model_name="b", arena_name="b", aa_name=None,
+            model_name="b",
+            arena_name="b",
+            aa_name=None,
             overall=CompositeScore(
-                category="overall", percentile=85.0,
-                arena_score=adjusted, aa_score=None,
+                category="overall",
+                percentile=85.0,
+                arena_score=adjusted,
+                aa_score=None,
             ),
-            categories={"overall": CompositeScore(
-                category="overall", percentile=85.0,
-                arena_score=adjusted, aa_score=None,
-            )},
+            categories={
+                "overall": CompositeScore(
+                    category="overall",
+                    percentile=85.0,
+                    arena_score=adjusted,
+                    aa_score=None,
+                )
+            },
         )
         findings = generate_category_findings([sc_a, sc_b], ["overall"])
         assert len(findings[0].variant_notes) == 1
