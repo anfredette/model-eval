@@ -6,8 +6,9 @@ from collections import defaultdict
 from collections.abc import Callable
 from typing import Any
 
-from model_eval.categories import CATEGORY_MAP
-from model_eval.models import CompositeScore, ModelScorecard, NormalizedScore
+from model_eval.categories import CATEGORY_MAP, display_name
+from model_eval.models import CategoryFinding, CompositeScore, ModelScorecard, NormalizedScore
+from model_eval.tiers import percentile_gap_significance
 from model_eval.variants import detect_variant_delta
 
 
@@ -180,15 +181,15 @@ def compute_scorecards(
             aa_norms[cat] = norms
 
     scorecards: list[ModelScorecard] = []
-    for display_name, arena_name, aa_name in target_models:
+    for display_name_str, arena_name, aa_name in target_models:
         cat_scores: dict[str, CompositeScore] = {}
         for cat in categories:
             a_score = arena_norms.get(cat, {}).get(arena_name) if arena_name else None
             aa_score = aa_norms.get(cat, {}).get(aa_name) if aa_name else None
             if a_score and arena_name:
-                a_score = _apply_variant_adjustment(a_score, display_name, arena_name)
+                a_score = _apply_variant_adjustment(a_score, display_name_str, arena_name)
             if aa_score and aa_name:
-                aa_score = _apply_variant_adjustment(aa_score, display_name, aa_name)
+                aa_score = _apply_variant_adjustment(aa_score, display_name_str, aa_name)
             if a_score or aa_score:
                 cat_scores[cat] = compute_composite(
                     cat, a_score, aa_score, arena_weight, aa_weight
@@ -197,7 +198,7 @@ def compute_scorecards(
         overall = cat_scores.get("overall")
         scorecards.append(
             ModelScorecard(
-                model_name=display_name,
+                model_name=display_name_str,
                 arena_name=arena_name,
                 aa_name=aa_name,
                 overall=overall,
@@ -206,3 +207,62 @@ def compute_scorecards(
         )
 
     return scorecards
+
+
+def generate_category_findings(
+    scorecards: list[ModelScorecard],
+    categories: list[str],
+) -> list[CategoryFinding]:
+    """Generate cross-source findings for each category with data for 2+ models.
+
+    All models with data in a category are included in ranked_models
+    (sorted descending by percentile), not just the top and bottom.
+    Gap description covers the spread from highest to lowest.
+    """
+    if len(scorecards) < 2:
+        return []
+
+    findings: list[CategoryFinding] = []
+
+    for cat in categories:
+        models_with_data: list[tuple[str, CompositeScore]] = []
+        for sc in scorecards:
+            cs = sc.categories.get(cat)
+            if cs is not None:
+                models_with_data.append((sc.model_name, cs))
+
+        if len(models_with_data) < 2:
+            continue
+
+        models_with_data.sort(key=lambda x: x[1].percentile, reverse=True)
+        ranked_models = [(name, cs.percentile) for name, cs in models_with_data]
+
+        top_pct = models_with_data[0][1].percentile
+        bottom_pct = models_with_data[-1][1].percentile
+        gap = top_pct - bottom_pct
+        gap_desc = percentile_gap_significance(gap)
+
+        provenances = {cs.provenance for _, cs in models_with_data}
+        if len(provenances) == 1:
+            provenance = provenances.pop()
+        else:
+            provenance = "mixed"
+
+        variant_notes: list[str] = []
+        for model_name, cs in models_with_data:
+            for score in [cs.arena_score, cs.aa_score]:
+                if score and score.confidence < 1.0 and score.adjustment:
+                    variant_notes.append(
+                        f"{model_name}: {score.adjustment} (confidence: {score.confidence})"
+                    )
+
+        findings.append(CategoryFinding(
+            category=cat,
+            display_name=display_name(cat),
+            ranked_models=ranked_models,
+            gap_description=gap_desc,
+            provenance=provenance,
+            variant_notes=variant_notes,
+        ))
+
+    return findings
