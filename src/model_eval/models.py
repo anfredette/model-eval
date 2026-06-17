@@ -105,6 +105,7 @@ class ComparisonResult:
     category_findings: list[CategoryFinding] = field(default_factory=list)
     arena_weight: float = 0.5
     aa_weight: float = 0.5
+    composite_chart_path: Path | None = None
 
 
 @dataclass

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
 
-from model_eval.categories import DEFAULT_CATEGORIES
+from model_eval.categories import CATEGORY_GROUPS, DEFAULT_CATEGORIES, DISPLAY_NAMES
 from model_eval.models import ComparisonResult
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -49,8 +49,11 @@ def render_comparison(result: ComparisonResult, output_path: Path) -> str:
         scorecards=result.scorecards,
         category_findings=result.category_findings,
         categories=DEFAULT_CATEGORIES,
+        category_groups=CATEGORY_GROUPS,
+        display_names=DISPLAY_NAMES,
         arena_weight=result.arena_weight,
         aa_weight=result.aa_weight,
+        composite_chart_path=result.composite_chart_path,
         introduction=_generate_introduction(result),
         date=date.today().isoformat(),
     )

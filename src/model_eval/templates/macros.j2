@@ -34,11 +34,12 @@
 {%- if mt and mt.value == "exact" %}exact{% elif mt and mt.value == "equivalent" %}equivalent{% elif mt and mt.value == "fuzzy" %}fuzzy{% else %}not found{% endif -%}
 {%- endmacro -%}
 
-{%- macro render_composite_table(scorecards, categories, arena_weight, aa_weight) -%}
+{%- macro render_composite_table(scorecards, category_groups, display_names, arena_weight, aa_weight) -%}
 ## Composite Scores (Arena {{ "%.0f"|format(arena_weight * 100) }}% / AA {{ "%.0f"|format(aa_weight * 100) }}%)
 
+{% for group_name, group_cats in category_groups -%}
 {% set active_cats = [] -%}
-{% for cat in categories -%}
+{% for cat in group_cats -%}
 {% for sc in scorecards -%}
 {% if cat in sc.categories -%}
 {% if cat not in active_cats -%}
@@ -48,7 +49,10 @@
 {% endfor -%}
 {% endfor -%}
 {% if active_cats -%}
-| Model |{% for cat in active_cats %} {{ cat | replace('_', ' ') | title }} |{% endfor %}
+
+### {{ group_name }}
+
+| Model |{% for cat in active_cats %} {{ display_names.get(cat, cat) }} |{% endfor %}
 
 | ------|{% for cat in active_cats %} ------:|{% endfor %}
 
@@ -62,11 +66,12 @@
 {%- endfor %}
 
 {% endfor -%}
-_[B] = both sources, [A] = Arena only, [AA] = AA only, [M] = mixed. * = estimated (variant adjustment)._
 {% endif -%}
+{% endfor -%}
+_[B] = both sources, [A] = Arena only, [AA] = AA only, [M] = mixed. * = estimated (variant adjustment)._
 {%- endmacro -%}
 
-{%- macro render_scorecard_detail(sc, categories) -%}
+{%- macro render_scorecard_detail(sc, categories, display_names) -%}
 ### {{ sc.model_name }}
 {% set arena_label = match_type_label(sc.arena_match_type) -%}
 {% set aa_label = match_type_label(sc.aa_match_type) -%}
@@ -87,7 +92,7 @@ _Arena: {{ sc.arena_name or "not found" }} ({{ arena_label }}) · AA: {{ sc.aa_n
 {% set aa_pct = fmt_percentile(cs.aa_score.percentile) if cs.aa_score else "--" -%}
 {% set star = "*" if (cs.arena_score and cs.arena_score.confidence < 1.0) or (cs.aa_score and cs.aa_score.confidence < 1.0) else "" -%}
 {% set prov = "Both" if cs.provenance == "both" else ("Arena" if cs.provenance == "arena_only" else "AA") -%}
-| {{ cat | replace('_', ' ') | title }} | {{ a_raw }}{{ star }} | {{ a_pct }}{{ star }} | {{ aa_raw }}{{ star }} | {{ aa_pct }}{{ star }} | {{ fmt_percentile(cs.percentile) }}{{ star }} | {{ prov }} |
+| {{ display_names.get(cat, cat) }} | {{ a_raw }}{{ star }} | {{ a_pct }}{{ star }} | {{ aa_raw }}{{ star }} | {{ aa_pct }}{{ star }} | {{ fmt_percentile(cs.percentile) }}{{ star }} | {{ prov }} |
 {% endif -%}
 {% endfor -%}
 {% set adjustments = [] -%}
