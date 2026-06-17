@@ -481,7 +481,6 @@ def scores_command(
 
     from model_eval.categories import ALL_CATEGORIES, DEFAULT_CATEGORIES, display_name
     from model_eval.models import NormalizedScore
-    from model_eval.resolver import resolve_model_names
 
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
@@ -500,55 +499,31 @@ def scores_command(
             "No cached data. Run 'model-eval sync-arena' and/or 'model-eval sync-aa' first."
         )
 
-    arena_names = sorted({r["model_name"] for r in arena_rows if r.get("category") == "overall"})
-    aa_names = [m["name"] for m in aa_models]
-
-    arena_results = resolve_model_names(model_names, arena_names) if arena_names else []
-    aa_results = resolve_model_names(model_names, aa_names) if aa_names else []
-
-    target_models: list[tuple[str, str | None, str | None]] = []
-    fuzzy_notices: list[str] = []
-    for i, name in enumerate(model_names):
-        arena_match: str | None = None
-        aa_match: str | None = None
-
-        if arena_results:
-            mr = arena_results[i]
-            if mr.match_type in (MatchType.EXACT, MatchType.EQUIVALENT) or (
-                fuzzy and mr.match_type == MatchType.FUZZY and mr.matched_name
-            ):
-                arena_match = mr.matched_name
-            if arena_match and mr.match_type == MatchType.FUZZY:
-                fuzzy_notices.append(f'  "{name}" -> "{arena_match}" (fuzzy match in Arena)')
-
-        if aa_results:
-            mr = aa_results[i]
-            if mr.match_type in (MatchType.EXACT, MatchType.EQUIVALENT) or (
-                fuzzy and mr.match_type == MatchType.FUZZY and mr.matched_name
-            ):
-                aa_match = mr.matched_name
-            if aa_match and mr.match_type == MatchType.FUZZY:
-                fuzzy_notices.append(f'  "{name}" -> "{aa_match}" (fuzzy match in AA)')
-
-        if not arena_match and not aa_match:
-            click.echo(f'Warning: "{name}" not found in either source.', err=True)
-            continue
-
-        target_models.append((name, arena_match, aa_match))
-
-    if not target_models:
-        raise click.ClickException("No models found in any source.")
-
     categories = ALL_CATEGORIES if all_categories else DEFAULT_CATEGORIES
 
-    scorecards = compute_scorecards(
+    scorecards = build_scorecards(
+        model_names=model_names,
         arena_rows=arena_rows,
         aa_models=aa_models,
-        target_models=target_models,
         categories=categories,
         arena_weight=arena_weight,
         aa_weight=aa_weight,
+        fuzzy=fuzzy,
     )
+
+    if not scorecards:
+        raise click.ClickException("No models found in any source.")
+
+    fuzzy_notices: list[str] = []
+    for sc in scorecards:
+        if sc.arena_match_type == MatchType.FUZZY and sc.arena_name:
+            fuzzy_notices.append(
+                f'  "{sc.model_name}" -> "{sc.arena_name}" (fuzzy match in Arena)'
+            )
+        if sc.aa_match_type == MatchType.FUZZY and sc.aa_name:
+            fuzzy_notices.append(
+                f'  "{sc.model_name}" -> "{sc.aa_name}" (fuzzy match in AA)'
+            )
 
     console = Console()
 
