@@ -1,6 +1,12 @@
 import pytest
 
-from model_eval.tiers import aa_gap_significance, arena_gap_significance, tier_label
+from model_eval.tiers import (
+    aa_gap_significance,
+    arena_gap_significance,
+    percentile_gap_significance,
+    percentile_tier_label,
+    tier_label,
+)
 
 
 @pytest.mark.unit
@@ -76,3 +82,43 @@ class TestAAGapSignificance:
     def test_equal_scores(self) -> None:
         result = aa_gap_significance(50.0, 50.0, 13.3)
         assert result == "not clearly distinguishable"
+
+
+@pytest.mark.unit
+class TestPercentileTierLabel:
+    def test_frontier(self) -> None:
+        assert percentile_tier_label(95.0) == "Frontier"
+        assert percentile_tier_label(99.9) == "Frontier"
+
+    def test_near_frontier(self) -> None:
+        assert percentile_tier_label(85.0) == "Near-frontier"
+        assert percentile_tier_label(94.9) == "Near-frontier"
+
+    def test_upper_mid(self) -> None:
+        assert percentile_tier_label(50.0) == "Upper-mid"
+        assert percentile_tier_label(84.9) == "Upper-mid"
+
+    def test_mid_tier(self) -> None:
+        assert percentile_tier_label(15.0) == "Mid-tier"
+        assert percentile_tier_label(49.9) == "Mid-tier"
+
+    def test_long_tail(self) -> None:
+        assert percentile_tier_label(14.9) == "Long-tail"
+        assert percentile_tier_label(0.0) == "Long-tail"
+
+
+@pytest.mark.unit
+class TestPercentileGapSignificance:
+    def test_effectively_equivalent(self) -> None:
+        assert percentile_gap_significance(3.0) == "effectively equivalent"
+        assert percentile_gap_significance(0.0) == "effectively equivalent"
+        assert percentile_gap_significance(4.9) == "effectively equivalent"
+
+    def test_moderate_advantage(self) -> None:
+        assert percentile_gap_significance(5.0) == "moderate advantage"
+        assert percentile_gap_significance(10.0) == "moderate advantage"
+        assert percentile_gap_significance(15.0) == "moderate advantage"
+
+    def test_clear_separation(self) -> None:
+        assert percentile_gap_significance(15.1) == "clear separation"
+        assert percentile_gap_significance(30.0) == "clear separation"

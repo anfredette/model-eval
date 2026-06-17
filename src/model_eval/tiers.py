@@ -56,3 +56,29 @@ def aa_gap_significance(score_a: float, score_b: float, population_stdev: float)
     if gap_in_stdev <= 1.0:
         return "moderate difference"
     return "clear separation"
+
+
+PERCENTILE_TIER_BOUNDARIES: list[tuple[float, str]] = [
+    (95.0, "Frontier"),
+    (85.0, "Near-frontier"),
+    (50.0, "Upper-mid"),
+    (15.0, "Mid-tier"),
+]
+PERCENTILE_TIER_DEFAULT = "Long-tail"
+
+
+def percentile_tier_label(percentile: float) -> str:
+    """Return tier name for a composite percentile (0-100)."""
+    for cutoff, label in PERCENTILE_TIER_BOUNDARIES:
+        if percentile >= cutoff:
+            return label
+    return PERCENTILE_TIER_DEFAULT
+
+
+def percentile_gap_significance(gap: float) -> str:
+    """Describe the gap between two composite percentiles."""
+    if gap < 5.0:
+        return "effectively equivalent"
+    if gap <= 15.0:
+        return "moderate advantage"
+    return "clear separation"
