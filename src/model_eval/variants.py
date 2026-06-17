@@ -19,9 +19,7 @@ _INSTRUCT_PATTERN = re.compile(r"\binstruct\b", re.IGNORECASE)
 _REASONING_PATTERN = re.compile(r"\b(?:reasoning|thinking)\b", re.IGNORECASE)
 
 
-def detect_variant_delta(
-    user_name: str, matched_name: str
-) -> tuple[float, str | None]:
+def detect_variant_delta(user_name: str, matched_name: str) -> tuple[float, str | None]:
     user_lower = user_name.lower()
     matched_lower = matched_name.lower()
 
@@ -64,9 +62,7 @@ def compute_reasoning_deltas(
     for m in aa_models:
         name = m["name"]
         lower = name.lower()
-        base = re.sub(
-            r"\s*\((?:non-)?reasoning\).*$", "", lower, flags=re.IGNORECASE
-        ).strip()
+        base = re.sub(r"\s*\((?:non-)?reasoning\).*$", "", lower, flags=re.IGNORECASE).strip()
 
         if "(non-reasoning)" in lower:
             pairs.setdefault(base, {})["non_reasoning"] = m
