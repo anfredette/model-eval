@@ -20,8 +20,7 @@ class TestRenderCategoryFindingMacro:
             lstrip_blocks=True,
         )
         template = env.from_string(
-            '{% from "macros.j2" import render_category_finding %}'
-            "{{ render_category_finding(f) }}"
+            '{% from "macros.j2" import render_category_finding %}{{ render_category_finding(f) }}'
         )
         return template.render(f=finding)
 

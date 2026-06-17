@@ -6,7 +6,6 @@ from dataclasses import dataclass
 
 from model_eval.models import MatchType
 
-
 _SUFFIXES_TO_STRIP = [
     "-nvfp4",
     "-fp8-dynamic",
@@ -52,10 +51,9 @@ def _normalize_separators(s: str) -> str:
 def _sorted_tokens(s: str) -> tuple[str, ...]:
     raw = re.findall(r"[a-z0-9]+(?:\.[a-z0-9]+)*", s.lower())
     filtered = [
-        t for t in raw
-        if t not in _QUANT_TOKENS
-        and not t.startswith("quantized")
-        and not _DATE_SUFFIX_RE.match(t)
+        t
+        for t in raw
+        if t not in _QUANT_TOKENS and not t.startswith("quantized") and not _DATE_SUFFIX_RE.match(t)
     ]
     alpha = sorted(t for t in filtered if not t.isdigit())
     numeric = [t for t in filtered if t.isdigit()]
@@ -80,7 +78,7 @@ def _strip_org(s: str) -> str:
     lower = result.lower()
     for prefix in _ORG_PREFIXES:
         if lower.startswith(prefix):
-            return result[len(prefix):]
+            return result[len(prefix) :]
     return result
 
 
@@ -166,9 +164,7 @@ def _version_distance(a: list[int | str], b: list[int | str]) -> float:
     return abs(_version_to_scalar(a) - _version_to_scalar(b))
 
 
-def resolve_model_names(
-    user_names: list[str], known_names: list[str]
-) -> list[MatchResult]:
+def resolve_model_names(user_names: list[str], known_names: list[str]) -> list[MatchResult]:
     known_set = set(known_names)
 
     lower_map: dict[str, str] = {}
@@ -201,9 +197,7 @@ def resolve_model_names(
 
     suffix_stripped_token_map: dict[tuple[str, ...], str] = {}
     for k in known_names:
-        suffix_stripped_token_map.setdefault(
-            _sorted_tokens(_strip_suffixes(_strip_org(k))), k
-        )
+        suffix_stripped_token_map.setdefault(_sorted_tokens(_strip_suffixes(_strip_org(k))), k)
 
     results: list[MatchResult] = []
     for name in user_names:
@@ -323,9 +317,7 @@ def _resolve_one(
         for known in known_names:
             if _extract_family(known) != user_family:
                 continue
-            known_words = set(
-                re.findall(r"[a-z0-9]+(?:\.[a-z0-9]+)*", _strip_org(known).lower())
-            )
+            known_words = set(re.findall(r"[a-z0-9]+(?:\.[a-z0-9]+)*", _strip_org(known).lower()))
             common = user_words & known_words
             if len(common) < 2:
                 continue
