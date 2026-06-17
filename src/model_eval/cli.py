@@ -16,9 +16,10 @@ import model_eval.sources.arena  # noqa: F401
 import model_eval.sources.artificial_analysis  # noqa: F401
 from model_eval import aa_client, arena_client
 from model_eval.charts import generate_distribution_chart
-from model_eval.models import ComparisonResult, MatchType
+from model_eval.models import ComparisonResult, MatchType, ModelScorecard
 from model_eval.renderer import render_comparison
-from model_eval.resolver import suggest_similar
+from model_eval.resolver import resolve_model_names, suggest_similar
+from model_eval.scoring import compute_scorecards
 from model_eval.sources import get_available_sources, get_source
 
 REPORTS_DIR = Path("reports")
@@ -73,6 +74,84 @@ def generate_output_path(model_names: list[str]) -> Path:
             max_n = max(max_n, int(m.group(1)))
 
     return REPORTS_DIR / f"{base}_{max_n + 1:02d}.md"
+
+
+def build_scorecards(
+    model_names: list[str],
+    arena_rows: list[dict[str, Any]],
+    aa_models: list[dict[str, Any]],
+    categories: list[str],
+    arena_weight: float = 0.5,
+    aa_weight: float = 0.5,
+    fuzzy: bool = False,
+) -> list[ModelScorecard]:
+    """Resolve model names against both sources, compute normalized
+    composite scorecards.
+
+    Wraps compute_scorecards() with name resolution. Each returned
+    scorecard has arena_match_type and aa_match_type populated from
+    the resolver results.
+
+    Lives in the CLI layer (not scoring.py) because it depends on
+    resolver.py, which is model-eval-specific. scoring.py stays
+    portable to llm-d-planner.
+    """
+    arena_names = sorted(
+        {r["model_name"] for r in arena_rows if r.get("category") == "overall"}
+    )
+    aa_names = [m["name"] for m in aa_models]
+
+    arena_results = resolve_model_names(model_names, arena_names) if arena_names else []
+    aa_results = resolve_model_names(model_names, aa_names) if aa_names else []
+
+    target_models: list[tuple[str, str | None, str | None]] = []
+    match_types: list[tuple[MatchType | None, MatchType | None]] = []
+
+    for i, name in enumerate(model_names):
+        arena_match: str | None = None
+        arena_mt: MatchType | None = None
+        aa_match: str | None = None
+        aa_mt: MatchType | None = None
+
+        if arena_results:
+            mr = arena_results[i]
+            if mr.match_type in (MatchType.EXACT, MatchType.EQUIVALENT) or (
+                fuzzy and mr.match_type == MatchType.FUZZY and mr.matched_name
+            ):
+                arena_match = mr.matched_name
+                arena_mt = mr.match_type
+
+        if aa_results:
+            mr = aa_results[i]
+            if mr.match_type in (MatchType.EXACT, MatchType.EQUIVALENT) or (
+                fuzzy and mr.match_type == MatchType.FUZZY and mr.matched_name
+            ):
+                aa_match = mr.matched_name
+                aa_mt = mr.match_type
+
+        if not arena_match and not aa_match:
+            continue
+
+        target_models.append((name, arena_match, aa_match))
+        match_types.append((arena_mt, aa_mt))
+
+    if not target_models:
+        return []
+
+    scorecards = compute_scorecards(
+        arena_rows=arena_rows,
+        aa_models=aa_models,
+        target_models=target_models,
+        categories=categories,
+        arena_weight=arena_weight,
+        aa_weight=aa_weight,
+    )
+
+    for sc, (arena_mt, aa_mt) in zip(scorecards, match_types, strict=True):
+        sc.arena_match_type = arena_mt
+        sc.aa_match_type = aa_mt
+
+    return scorecards
 
 
 @click.group(invoke_without_command=True)
@@ -330,7 +409,6 @@ def scores_command(
     from model_eval.categories import ALL_CATEGORIES, DEFAULT_CATEGORIES, display_name
     from model_eval.models import NormalizedScore
     from model_eval.resolver import resolve_model_names
-    from model_eval.scoring import compute_scorecards
 
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
