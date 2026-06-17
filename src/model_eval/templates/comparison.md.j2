@@ -1,4 +1,4 @@
-{% from "macros.j2" import render_table, render_h2h %}
+{% from "macros.j2" import render_table, render_h2h, render_composite_table, render_scorecard_detail, render_category_finding %}
 # Model Comparison: {{ model_names | join(' vs ') }}
 
 **Date:** {{ date }}
@@ -13,6 +13,28 @@
 {% if not loop.last %}| | | |
 {% endif %}
 {%- endfor %}
+{% endif %}
+{% if scorecards %}
+
+{{ render_composite_table(scorecards, categories, arena_weight, aa_weight) }}
+
+---
+
+## Model Detail Cards
+{% for sc in scorecards %}
+
+{{ render_scorecard_detail(sc, categories) }}
+{% endfor %}
+{% endif %}
+{% if category_findings %}
+
+---
+
+## Category Analysis
+
+{% for f in category_findings %}
+{{ loop.index }}. {{ render_category_finding(f) }}
+{% endfor %}
 {% endif %}
 {% if overall_conclusions %}
 
@@ -119,6 +141,28 @@ Tiers are based on absolute rank within each data source:
 **Arena** — uses per-model confidence intervals (CI). If CIs overlap, the models are "statistically indistinguishable." If CIs don't overlap but the closest bounds are within 20 points, the difference is "small but statistically significant." A gap of 20+ points between closest bounds indicates "clear separation."
 
 **Artificial Analysis** — uses gap relative to population standard deviation. A gap below 0.5 stdev is "not clearly distinguishable," 0.5–1.0 stdev indicates a "moderate difference," and above 1.0 stdev indicates "clear separation."
+{% if scorecards %}
+
+### Composite Tiers (percentile-based)
+
+Used in the Composite Scores and Category Analysis sections:
+
+| Tier | Percentile Range |
+|------|-----------------|
+| Frontier | ≥95th |
+| Near-frontier | 85th–94th |
+| Upper-mid | 50th–84th |
+| Mid-tier | 15th–49th |
+| Long-tail | Below 15th |
+
+### Gap Significance (composite percentiles)
+
+| Gap | Description |
+|-----|-------------|
+| <5 percentile points | Effectively equivalent |
+| 5–15 percentile points | Moderate advantage |
+| >15 percentile points | Clear separation |
+{% endif %}
 
 ---
 
