@@ -101,6 +101,10 @@ class ComparisonResult:
     model_names: list[str]
     sources: list[SourceData] = field(default_factory=list)
     overall_conclusions: list[str] = field(default_factory=list)
+    scorecards: list[ModelScorecard] = field(default_factory=list)
+    category_findings: list[CategoryFinding] = field(default_factory=list)
+    arena_weight: float = 0.5
+    aa_weight: float = 0.5
 
 
 @dataclass
@@ -143,5 +147,23 @@ class ModelScorecard:
     model_name: str
     arena_name: str | None
     aa_name: str | None
-    overall: CompositeScore | None
+    arena_match_type: MatchType | None = None
+    aa_match_type: MatchType | None = None
+    overall: CompositeScore | None = None
     categories: dict[str, CompositeScore] = field(default_factory=dict)
+
+
+@dataclass
+class CategoryFinding:
+    """Structured per-category finding for template rendering.
+
+    ranked_models is sorted descending by percentile — all models
+    with data in this category, not just the top and bottom.
+    """
+
+    category: str
+    display_name: str
+    ranked_models: list[tuple[str, float]]
+    gap_description: str
+    provenance: str
+    variant_notes: list[str] = field(default_factory=list)
