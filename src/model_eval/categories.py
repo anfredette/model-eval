@@ -117,6 +117,46 @@ def display_name(category: str) -> str:
     return DISPLAY_NAMES.get(category, category)
 
 
+CATEGORY_GROUPS: list[tuple[str, list[str]]] = [
+    (
+        "General Capabilities",
+        [
+            "overall",
+            "coding",
+            "math",
+            "creative_writing",
+            "instruction_following",
+            "hard_prompts",
+            "expert",
+            "multi_turn",
+            "longer_query",
+        ],
+    ),
+    (
+        "Industry",
+        [
+            "industry_software_and_it_services",
+            "industry_legal_and_government",
+            "industry_life_and_physical_and_social_science",
+            "industry_mathematical",
+            "industry_writing_and_literature_and_language",
+        ],
+    ),
+    (
+        "Benchmarks (AA)",
+        [
+            "mmlu_pro",
+            "gpqa",
+            "hle",
+            "livecodebench",
+            "scicode",
+            "math_500",
+            "aime",
+        ],
+    ),
+]
+
+
 AA_INDEX_FIELDS: list[str] = [
     "intelligence_index",
     "coding_index",

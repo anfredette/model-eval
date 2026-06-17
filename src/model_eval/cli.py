@@ -15,7 +15,7 @@ import click
 import model_eval.sources.arena  # noqa: F401
 import model_eval.sources.artificial_analysis  # noqa: F401
 from model_eval import aa_client, arena_client
-from model_eval.charts import generate_distribution_chart
+from model_eval.charts import generate_composite_chart, generate_distribution_chart
 from model_eval.models import ComparisonResult, MatchType, ModelScorecard
 from model_eval.renderer import render_comparison
 from model_eval.resolver import resolve_model_names, suggest_similar
@@ -102,7 +102,9 @@ def parse_weights(weights_str: str) -> tuple[float, float]:
         try:
             val = float(val_str.strip())
         except ValueError as e:
-            raise click.UsageError(f"Weight for '{key}' must be a number, got '{val_str.strip()}'.") from e
+            raise click.UsageError(
+                f"Weight for '{key}' must be a number, got '{val_str.strip()}'."
+            ) from e
         if val <= 0:
             raise click.UsageError(f"Weight for '{key}' must be positive, got {val}.")
         parsed[key] = val
@@ -353,6 +355,21 @@ def main(
         result.arena_weight = arena_weight
         result.aa_weight = aa_weight
         result.category_findings = generate_category_findings(scorecards, DEFAULT_CATEGORIES)
+
+        chart_models = [
+            {
+                "name": sc.model_name,
+                "score": sc.overall.percentile,
+                "family": sc.model_name.split("-")[0] if "-" in sc.model_name else sc.model_name,
+            }
+            for sc in scorecards
+            if sc.overall
+        ]
+        if chart_models:
+            composite_chart_path = output_path.with_name(f"{output_path.stem}_composite.png")
+            generate_composite_chart(chart_models, composite_chart_path)
+            result.composite_chart_path = Path(composite_chart_path.name)
+            click.echo(f"Chart written to {composite_chart_path}")
 
     render_comparison(result, output_path)
     click.echo(f"Comparison written to {output_path}")

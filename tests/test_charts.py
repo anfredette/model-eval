@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from model_eval.charts import generate_distribution_chart
+from model_eval.charts import generate_composite_chart, generate_distribution_chart
 
 
 @pytest.mark.unit
@@ -50,4 +50,44 @@ class TestGenerateDistributionChart:
         ]
         out = tmp_path / "colors.png"
         result = generate_distribution_chart(scores, models, out, "Score", 50.0)
+        assert result.exists()
+
+
+@pytest.mark.unit
+class TestGenerateCompositeChart:
+    def test_creates_png(self, tmp_path: Path) -> None:
+        models = [
+            {"name": "model-a", "score": 94.2, "family": "Org A"},
+            {"name": "model-b", "score": 75.0, "family": "Org B"},
+        ]
+        out = tmp_path / "composite.png"
+        result = generate_composite_chart(models, out)
+        assert result == out
+        assert out.exists()
+        assert out.stat().st_size > 0
+
+    def test_single_model(self, tmp_path: Path) -> None:
+        models = [{"name": "solo", "score": 96.0, "family": "Solo Org"}]
+        out = tmp_path / "single.png"
+        result = generate_composite_chart(models, out)
+        assert result.exists()
+
+    def test_no_models(self, tmp_path: Path) -> None:
+        out = tmp_path / "empty.png"
+        result = generate_composite_chart([], out)
+        assert result.exists()
+
+    def test_many_models(self, tmp_path: Path) -> None:
+        models = [
+            {"name": f"model-{i}", "score": 10.0 + i * 8, "family": f"Org {'A' if i < 5 else 'B'}"}
+            for i in range(10)
+        ]
+        out = tmp_path / "many.png"
+        result = generate_composite_chart(models, out)
+        assert result.exists()
+
+    def test_custom_title(self, tmp_path: Path) -> None:
+        models = [{"name": "m1", "score": 50.0, "family": "X"}]
+        out = tmp_path / "titled.png"
+        result = generate_composite_chart(models, out, title="Custom Title")
         assert result.exists()
