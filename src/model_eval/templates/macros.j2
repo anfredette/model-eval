@@ -21,3 +21,89 @@
 | {{ h2h.dimensions[i] }} | {{ '%.1f'|format(h2h.a_scores[i]) }} | {{ '%.1f'|format(h2h.b_scores[i]) }} | {% if bold %}**{{ fmt_delta }}**{% else %}{{ fmt_delta }}{% endif %} | {{ winner }} |
 {% endfor -%}
 {%- endmacro -%}
+
+{%- macro provenance_label(prov) -%}
+{%- if prov == "both" %}[B]{% elif prov == "arena_only" %}[A]{% elif prov == "aa_only" %}[AA]{% elif prov == "mixed" %}[M]{% else %}[?]{% endif -%}
+{%- endmacro -%}
+
+{%- macro fmt_percentile(val) -%}
+{{ "%.1f"|format(val) }}
+{%- endmacro -%}
+
+{%- macro match_type_label(mt) -%}
+{%- if mt and mt.value == "exact" %}exact{% elif mt and mt.value == "equivalent" %}equivalent{% elif mt and mt.value == "fuzzy" %}fuzzy{% else %}not found{% endif -%}
+{%- endmacro -%}
+
+{%- macro render_composite_table(scorecards, categories, arena_weight, aa_weight) -%}
+## Composite Scores (Arena {{ "%.0f"|format(arena_weight * 100) }}% / AA {{ "%.0f"|format(aa_weight * 100) }}%)
+
+{% set active_cats = [] -%}
+{% for cat in categories -%}
+{% for sc in scorecards -%}
+{% if cat in sc.categories -%}
+{% if cat not in active_cats -%}
+{% if active_cats.append(cat) %}{% endif -%}
+{% endif -%}
+{% endif -%}
+{% endfor -%}
+{% endfor -%}
+{% if active_cats -%}
+| Model |{% for cat in active_cats %} {{ cat | replace('_', ' ') | title }} |{% endfor %}
+
+| ------|{% for cat in active_cats %} ------:|{% endfor %}
+
+{% for sc in scorecards -%}
+| **{{ sc.model_name }}** |
+{%- for cat in active_cats -%}
+{%- set cs = sc.categories.get(cat) -%}
+{%- if cs %} {{ fmt_percentile(cs.percentile) }}{{ "*" if cs.arena_score and cs.arena_score.confidence < 1.0 or cs.aa_score and cs.aa_score.confidence < 1.0 else "" }} {{ provenance_label(cs.provenance) }} |
+{%- else %} -- |
+{%- endif -%}
+{%- endfor %}
+
+{% endfor -%}
+_[B] = both sources, [A] = Arena only, [AA] = AA only, [M] = mixed. * = estimated (variant adjustment)._
+{% endif -%}
+{%- endmacro -%}
+
+{%- macro render_scorecard_detail(sc, categories) -%}
+### {{ sc.model_name }}
+{% set arena_label = match_type_label(sc.arena_match_type) -%}
+{% set aa_label = match_type_label(sc.aa_match_type) -%}
+_Arena: {{ sc.arena_name or "not found" }} ({{ arena_label }}) · AA: {{ sc.aa_name or "not found" }} ({{ aa_label }})_
+{% if sc.arena_match_type and sc.arena_match_type.value == "fuzzy" or sc.aa_match_type and sc.aa_match_type.value == "fuzzy" %}
+> **Note:** Scores based on approximate name match — verify model identity.
+{% endif %}
+
+| Category | Arena Raw | Arena %ile | AA Raw | AA %ile | Composite | Source |
+| ---------|----------:|----------:|-------:|--------:|----------:|--------|
+{% for cat in categories -%}
+{% set cs = sc.categories.get(cat) -%}
+{% if cs -%}
+{% set a_raw = "%.1f"|format(cs.arena_score.raw_score) if cs.arena_score else "--" -%}
+{% set a_pct = fmt_percentile(cs.arena_score.percentile) if cs.arena_score else "--" -%}
+{% set aa_raw_val = cs.aa_score.raw_score if cs.aa_score else None -%}
+{% set aa_raw = ("%.0f"|format(aa_raw_val) if aa_raw_val == (aa_raw_val|int) else "%.3f"|format(aa_raw_val)) if aa_raw_val is not none else "--" -%}
+{% set aa_pct = fmt_percentile(cs.aa_score.percentile) if cs.aa_score else "--" -%}
+{% set star = "*" if (cs.arena_score and cs.arena_score.confidence < 1.0) or (cs.aa_score and cs.aa_score.confidence < 1.0) else "" -%}
+{% set prov = "Both" if cs.provenance == "both" else ("Arena" if cs.provenance == "arena_only" else "AA") -%}
+| {{ cat | replace('_', ' ') | title }} | {{ a_raw }}{{ star }} | {{ a_pct }}{{ star }} | {{ aa_raw }}{{ star }} | {{ aa_pct }}{{ star }} | {{ fmt_percentile(cs.percentile) }}{{ star }} | {{ prov }} |
+{% endif -%}
+{% endfor -%}
+{% set adjustments = [] -%}
+{% for cat, cs in sc.categories.items() -%}
+{% for score in [cs.arena_score, cs.aa_score] -%}
+{% if score and score.confidence < 1.0 and score.adjustment -%}
+{% if adjustments.append(score.adjustment) %}{% endif -%}
+{% endif -%}
+{% endfor -%}
+{% endfor -%}
+{% if adjustments %}
+_* Estimated scores: {{ adjustments | unique | join(", ") }}_
+{% endif -%}
+{%- endmacro -%}
+
+{%- macro render_category_finding(f) -%}
+**{{ f.display_name }}:** {% for name, pct in f.ranked_models %}{{ name }} ({{ fmt_percentile(pct) }} %ile){% if not loop.last %} · {% endif %}{% endfor %} — {{ f.gap_description }}. [{{ f.provenance | replace('_', ' ') | title }}]
+{%- if f.variant_notes %} _({{ f.variant_notes | join("; ") }})_{% endif -%}
+{%- endmacro -%}
