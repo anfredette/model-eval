@@ -3,6 +3,7 @@ from __future__ import annotations
 from model_eval.models import (
     CategoryFinding,
     ComparisonResult,
+    CompositeScore,
     MatchType,
     ModelScorecard,
     NormalizedScore,
@@ -10,6 +11,7 @@ from model_eval.models import (
 from model_eval.scoring import (
     compute_composite,
     compute_scorecards,
+    generate_category_findings,
     normalize_aa_index,
     normalize_arena_category,
 )
@@ -300,3 +302,200 @@ class TestComparisonResultNewFields:
         assert r.category_findings == []
         assert r.arena_weight == 0.5
         assert r.aa_weight == 0.5
+
+
+class TestGenerateCategoryFindings:
+    def _make_scorecard(self, name, overall_pct, coding_pct=None, provenance="both"):
+        arena_score = NormalizedScore(
+            raw_score=1500, percentile=overall_pct, tied_rank=1,
+            population_size=100, source="arena",
+        )
+        aa_score = NormalizedScore(
+            raw_score=60, percentile=overall_pct, tied_rank=1,
+            population_size=100, source="aa",
+        ) if provenance == "both" else None
+
+        categories = {
+            "overall": CompositeScore(
+                category="overall", percentile=overall_pct,
+                arena_score=arena_score,
+                aa_score=aa_score,
+            ),
+        }
+        if coding_pct is not None:
+            categories["coding"] = CompositeScore(
+                category="coding", percentile=coding_pct,
+                arena_score=arena_score, aa_score=aa_score,
+            )
+
+        return ModelScorecard(
+            model_name=name, arena_name=name, aa_name=name,
+            overall=categories["overall"], categories=categories,
+        )
+
+    def test_two_models_one_category(self):
+        sc_a = self._make_scorecard("model-a", 94.2)
+        sc_b = self._make_scorecard("model-b", 82.3)
+        findings = generate_category_findings([sc_a, sc_b], ["overall"])
+        assert len(findings) == 1
+        f = findings[0]
+        assert isinstance(f, CategoryFinding)
+        assert f.category == "overall"
+        assert len(f.ranked_models) == 2
+        assert f.ranked_models[0] == ("model-a", 94.2)
+        assert f.ranked_models[1] == ("model-b", 82.3)
+
+    def test_three_models_all_present(self):
+        sc_a = self._make_scorecard("a", 96.0)
+        sc_b = self._make_scorecard("b", 85.0)
+        sc_c = self._make_scorecard("c", 70.0)
+        findings = generate_category_findings([sc_a, sc_b, sc_c], ["overall"])
+        assert len(findings) == 1
+        f = findings[0]
+        assert len(f.ranked_models) == 3
+        assert f.ranked_models[0] == ("a", 96.0)
+        assert f.ranked_models[1] == ("b", 85.0)
+        assert f.ranked_models[2] == ("c", 70.0)
+
+    def test_gap_description_uses_top_to_bottom_spread(self):
+        sc_a = self._make_scorecard("a", 96.0)
+        sc_b = self._make_scorecard("b", 70.0)
+        findings = generate_category_findings([sc_a, sc_b], ["overall"])
+        assert findings[0].gap_description == "clear separation"
+
+    def test_gap_description_moderate(self):
+        sc_a = self._make_scorecard("a", 90.0)
+        sc_b = self._make_scorecard("b", 80.0)
+        findings = generate_category_findings([sc_a, sc_b], ["overall"])
+        assert findings[0].gap_description == "moderate advantage"
+
+    def test_gap_description_equivalent(self):
+        sc_a = self._make_scorecard("a", 92.0)
+        sc_b = self._make_scorecard("b", 90.0)
+        findings = generate_category_findings([sc_a, sc_b], ["overall"])
+        assert findings[0].gap_description == "effectively equivalent"
+
+    def test_multiple_categories(self):
+        sc_a = self._make_scorecard("a", 94.0, coding_pct=96.0)
+        sc_b = self._make_scorecard("b", 82.0, coding_pct=70.0)
+        findings = generate_category_findings([sc_a, sc_b], ["overall", "coding"])
+        assert len(findings) == 2
+        cats = [f.category for f in findings]
+        assert "overall" in cats
+        assert "coding" in cats
+
+    def test_skips_category_with_single_model(self):
+        sc_a = self._make_scorecard("a", 94.0, coding_pct=96.0)
+        sc_b = self._make_scorecard("b", 82.0, coding_pct=None)
+        findings = generate_category_findings([sc_a, sc_b], ["overall", "coding"])
+        cats = [f.category for f in findings]
+        assert "overall" in cats
+        assert "coding" not in cats
+
+    def test_provenance_tracked(self):
+        arena_only = NormalizedScore(
+            raw_score=1500, percentile=90.0, tied_rank=1,
+            population_size=100, source="arena",
+        )
+        sc_a = ModelScorecard(
+            model_name="a", arena_name="a", aa_name=None,
+            overall=CompositeScore(
+                category="overall", percentile=90.0,
+                arena_score=arena_only, aa_score=None,
+            ),
+            categories={"overall": CompositeScore(
+                category="overall", percentile=90.0,
+                arena_score=arena_only, aa_score=None,
+            )},
+        )
+        sc_b = ModelScorecard(
+            model_name="b", arena_name="b", aa_name=None,
+            overall=CompositeScore(
+                category="overall", percentile=70.0,
+                arena_score=arena_only, aa_score=None,
+            ),
+            categories={"overall": CompositeScore(
+                category="overall", percentile=70.0,
+                arena_score=arena_only, aa_score=None,
+            )},
+        )
+        findings = generate_category_findings([sc_a, sc_b], ["overall"])
+        assert findings[0].provenance == "arena_only"
+
+    def test_mixed_provenance(self):
+        arena_score = NormalizedScore(
+            raw_score=1500, percentile=90.0, tied_rank=1,
+            population_size=100, source="arena",
+        )
+        aa_score = NormalizedScore(
+            raw_score=60, percentile=85.0, tied_rank=1,
+            population_size=100, source="aa",
+        )
+        sc_a = ModelScorecard(
+            model_name="a", arena_name="a", aa_name="A",
+            overall=CompositeScore(
+                category="overall", percentile=90.0,
+                arena_score=arena_score, aa_score=aa_score,
+            ),
+            categories={"overall": CompositeScore(
+                category="overall", percentile=90.0,
+                arena_score=arena_score, aa_score=aa_score,
+            )},
+        )
+        sc_b = ModelScorecard(
+            model_name="b", arena_name="b", aa_name=None,
+            overall=CompositeScore(
+                category="overall", percentile=70.0,
+                arena_score=arena_score, aa_score=None,
+            ),
+            categories={"overall": CompositeScore(
+                category="overall", percentile=70.0,
+                arena_score=arena_score, aa_score=None,
+            )},
+        )
+        findings = generate_category_findings([sc_a, sc_b], ["overall"])
+        assert findings[0].provenance == "mixed"
+
+    def test_variant_notes_included(self):
+        adjusted = NormalizedScore(
+            raw_score=1450, percentile=85.0, tied_rank=2,
+            population_size=100, source="arena",
+            confidence=0.8, adjustment="instruct variant",
+        )
+        sc_a = ModelScorecard(
+            model_name="a", arena_name="a", aa_name=None,
+            overall=CompositeScore(
+                category="overall", percentile=90.0,
+                arena_score=NormalizedScore(
+                    raw_score=1500, percentile=90.0, tied_rank=1,
+                    population_size=100, source="arena",
+                ),
+                aa_score=None,
+            ),
+            categories={"overall": CompositeScore(
+                category="overall", percentile=90.0,
+                arena_score=NormalizedScore(
+                    raw_score=1500, percentile=90.0, tied_rank=1,
+                    population_size=100, source="arena",
+                ),
+                aa_score=None,
+            )},
+        )
+        sc_b = ModelScorecard(
+            model_name="b", arena_name="b", aa_name=None,
+            overall=CompositeScore(
+                category="overall", percentile=85.0,
+                arena_score=adjusted, aa_score=None,
+            ),
+            categories={"overall": CompositeScore(
+                category="overall", percentile=85.0,
+                arena_score=adjusted, aa_score=None,
+            )},
+        )
+        findings = generate_category_findings([sc_a, sc_b], ["overall"])
+        assert len(findings[0].variant_notes) == 1
+        assert "instruct variant" in findings[0].variant_notes[0]
+
+    def test_empty_scorecards(self):
+        findings = generate_category_findings([], ["overall"])
+        assert findings == []
