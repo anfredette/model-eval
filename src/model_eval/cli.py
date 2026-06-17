@@ -30,7 +30,9 @@ def _load_catalog_models(path: str) -> list[str]:
         data = json.load(f)
     if isinstance(data, dict) and "models" in data:
         return [m["model_id"] for m in data["models"] if "model_id" in m]
-    raise click.UsageError(f"Expected JSON with a 'models' array containing 'model_id' fields: {path}")
+    raise click.UsageError(
+        f"Expected JSON with a 'models' array containing 'model_id' fields: {path}"
+    )
 
 
 def _get_model_names(models: str | None, catalog: str | None) -> list[str]:
@@ -82,31 +84,30 @@ def parse_weights(weights_str: str) -> tuple[float, float]:
     Values are pure weights — normalized by dividing each by the sum.
     Raises click.UsageError on invalid input.
     """
-    VALID_SOURCES = {"arena", "aa"}
+    valid_sources = {"arena", "aa"}
     parsed: dict[str, float] = {}
 
     for part in weights_str.split(","):
         part = part.strip()
         if "=" not in part:
             raise click.UsageError(
-                f"Invalid weight format '{part}'. Expected 'source=value', "
-                f"e.g., 'arena=50,aa=50'."
+                f"Invalid weight format '{part}'. Expected 'source=value', e.g., 'arena=50,aa=50'."
             )
         key, val_str = part.split("=", 1)
         key = key.strip().lower()
-        if key not in VALID_SOURCES:
+        if key not in valid_sources:
             raise click.UsageError(
-                f"Unknown source '{key}'. Valid sources: {', '.join(sorted(VALID_SOURCES))}."
+                f"Unknown source '{key}'. Valid sources: {', '.join(sorted(valid_sources))}."
             )
         try:
             val = float(val_str.strip())
-        except ValueError:
-            raise click.UsageError(f"Weight for '{key}' must be a number, got '{val_str.strip()}'.")
+        except ValueError as e:
+            raise click.UsageError(f"Weight for '{key}' must be a number, got '{val_str.strip()}'.") from e
         if val <= 0:
             raise click.UsageError(f"Weight for '{key}' must be positive, got {val}.")
         parsed[key] = val
 
-    missing = VALID_SOURCES - parsed.keys()
+    missing = valid_sources - parsed.keys()
     if missing:
         raise click.UsageError(
             f"Missing weight for: {', '.join(sorted(missing))}. "
@@ -137,9 +138,7 @@ def build_scorecards(
     resolver.py, which is model-eval-specific. scoring.py stays
     portable to llm-d-planner.
     """
-    arena_names = sorted(
-        {r["model_name"] for r in arena_rows if r.get("category") == "overall"}
-    )
+    arena_names = sorted({r["model_name"] for r in arena_rows if r.get("category") == "overall"})
     aa_names = [m["name"] for m in aa_models]
 
     arena_results = resolve_model_names(model_names, arena_names) if arena_names else []
@@ -353,9 +352,7 @@ def main(
         result.scorecards = scorecards
         result.arena_weight = arena_weight
         result.aa_weight = aa_weight
-        result.category_findings = generate_category_findings(
-            scorecards, DEFAULT_CATEGORIES
-        )
+        result.category_findings = generate_category_findings(scorecards, DEFAULT_CATEGORIES)
 
     render_comparison(result, output_path)
     click.echo(f"Comparison written to {output_path}")
@@ -517,13 +514,9 @@ def scores_command(
     fuzzy_notices: list[str] = []
     for sc in scorecards:
         if sc.arena_match_type == MatchType.FUZZY and sc.arena_name:
-            fuzzy_notices.append(
-                f'  "{sc.model_name}" -> "{sc.arena_name}" (fuzzy match in Arena)'
-            )
+            fuzzy_notices.append(f'  "{sc.model_name}" -> "{sc.arena_name}" (fuzzy match in Arena)')
         if sc.aa_match_type == MatchType.FUZZY and sc.aa_name:
-            fuzzy_notices.append(
-                f'  "{sc.model_name}" -> "{sc.aa_name}" (fuzzy match in AA)'
-            )
+            fuzzy_notices.append(f'  "{sc.model_name}" -> "{sc.aa_name}" (fuzzy match in AA)')
 
     console = Console()
 

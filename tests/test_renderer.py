@@ -6,9 +6,9 @@ import pytest
 
 from model_eval.models import (
     CategoryFinding,
-    CompositeScore,
     ComparisonResult,
     ComparisonTable,
+    CompositeScore,
     HeadToHead,
     MatchType,
     ModelScorecard,
@@ -21,20 +21,32 @@ from model_eval.renderer import render_comparison
 def _make_result_with_scorecards() -> ComparisonResult:
     """Standalone factory — does not depend on _make_result()."""
     arena_score_a = NormalizedScore(
-        raw_score=1500.0, percentile=95.0, tied_rank=1,
-        population_size=100, source="arena",
+        raw_score=1500.0,
+        percentile=95.0,
+        tied_rank=1,
+        population_size=100,
+        source="arena",
     )
     aa_score_a = NormalizedScore(
-        raw_score=60, percentile=90.0, tied_rank=1,
-        population_size=100, source="aa",
+        raw_score=60,
+        percentile=90.0,
+        tied_rank=1,
+        population_size=100,
+        source="aa",
     )
     arena_score_b = NormalizedScore(
-        raw_score=1400.0, percentile=80.0, tied_rank=5,
-        population_size=100, source="arena",
+        raw_score=1400.0,
+        percentile=80.0,
+        tied_rank=5,
+        population_size=100,
+        source="arena",
     )
     aa_score_b = NormalizedScore(
-        raw_score=40, percentile=70.0, tied_rank=5,
-        population_size=100, source="aa",
+        raw_score=40,
+        percentile=70.0,
+        tied_rank=5,
+        population_size=100,
+        source="aa",
     )
 
     sc_a = ModelScorecard(
@@ -44,13 +56,17 @@ def _make_result_with_scorecards() -> ComparisonResult:
         arena_match_type=MatchType.EXACT,
         aa_match_type=MatchType.EQUIVALENT,
         overall=CompositeScore(
-            category="overall", percentile=92.5,
-            arena_score=arena_score_a, aa_score=aa_score_a,
+            category="overall",
+            percentile=92.5,
+            arena_score=arena_score_a,
+            aa_score=aa_score_a,
         ),
         categories={
             "overall": CompositeScore(
-                category="overall", percentile=92.5,
-                arena_score=arena_score_a, aa_score=aa_score_a,
+                category="overall",
+                percentile=92.5,
+                arena_score=arena_score_a,
+                aa_score=aa_score_a,
             ),
         },
     )
@@ -61,13 +77,17 @@ def _make_result_with_scorecards() -> ComparisonResult:
         arena_match_type=MatchType.EXACT,
         aa_match_type=MatchType.EXACT,
         overall=CompositeScore(
-            category="overall", percentile=75.0,
-            arena_score=arena_score_b, aa_score=aa_score_b,
+            category="overall",
+            percentile=75.0,
+            arena_score=arena_score_b,
+            aa_score=aa_score_b,
         ),
         categories={
             "overall": CompositeScore(
-                category="overall", percentile=75.0,
-                arena_score=arena_score_b, aa_score=aa_score_b,
+                category="overall",
+                percentile=75.0,
+                arena_score=arena_score_b,
+                aa_score=aa_score_b,
             ),
         },
     )

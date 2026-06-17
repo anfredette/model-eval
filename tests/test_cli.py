@@ -4,7 +4,8 @@ import click
 import pytest
 from click.testing import CliRunner
 
-from model_eval.cli import main, parse_weights
+from model_eval.cli import build_scorecards, main, parse_weights
+from model_eval.models import MatchType
 
 
 @pytest.mark.unit
@@ -58,10 +59,6 @@ class TestCLI:
         assert "--weights" in result.output
 
 
-from model_eval.models import MatchType
-from model_eval.cli import build_scorecards
-
-
 class TestParseWeights:
     def test_equal_weights(self):
         arena, aa = parse_weights("arena=50,aa=50")
@@ -112,8 +109,20 @@ class TestParseWeights:
 class TestBuildScorecards:
     def test_resolves_and_scores(self):
         arena_rows = [
-            {"model_name": "model-a", "category": "overall", "rating": 1500, "rating_lower": 1495, "rating_upper": 1505},
-            {"model_name": "model-b", "category": "overall", "rating": 1400, "rating_lower": 1395, "rating_upper": 1405},
+            {
+                "model_name": "model-a",
+                "category": "overall",
+                "rating": 1500,
+                "rating_lower": 1495,
+                "rating_upper": 1505,
+            },
+            {
+                "model_name": "model-b",
+                "category": "overall",
+                "rating": 1400,
+                "rating_lower": 1395,
+                "rating_upper": 1405,
+            },
         ]
         aa_models = [
             {"name": "model-a", "intelligence_index": 60},
@@ -132,7 +141,13 @@ class TestBuildScorecards:
 
     def test_match_types_populated(self):
         arena_rows = [
-            {"model_name": "model-a", "category": "overall", "rating": 1500, "rating_lower": 1495, "rating_upper": 1505},
+            {
+                "model_name": "model-a",
+                "category": "overall",
+                "rating": 1500,
+                "rating_lower": 1495,
+                "rating_upper": 1505,
+            },
         ]
         aa_models = [
             {"name": "model-a", "intelligence_index": 60},
@@ -148,7 +163,13 @@ class TestBuildScorecards:
 
     def test_fuzzy_match_excluded_by_default(self):
         arena_rows = [
-            {"model_name": "model-alpha-v2", "category": "overall", "rating": 1500, "rating_lower": 1495, "rating_upper": 1505},
+            {
+                "model_name": "model-alpha-v2",
+                "category": "overall",
+                "rating": 1500,
+                "rating_lower": 1495,
+                "rating_upper": 1505,
+            },
         ]
         result = build_scorecards(
             model_names=["model-alpha"],
@@ -161,7 +182,13 @@ class TestBuildScorecards:
 
     def test_fuzzy_match_included_when_enabled(self):
         arena_rows = [
-            {"model_name": "model-alpha-v2", "category": "overall", "rating": 1500, "rating_lower": 1495, "rating_upper": 1505},
+            {
+                "model_name": "model-alpha-v2",
+                "category": "overall",
+                "rating": 1500,
+                "rating_lower": 1495,
+                "rating_upper": 1505,
+            },
         ]
         result = build_scorecards(
             model_names=["model-alpha"],
@@ -184,8 +211,20 @@ class TestBuildScorecards:
 
     def test_multiple_categories(self):
         arena_rows = [
-            {"model_name": "a", "category": "overall", "rating": 1500, "rating_lower": 1495, "rating_upper": 1505},
-            {"model_name": "a", "category": "coding", "rating": 1480, "rating_lower": 1475, "rating_upper": 1485},
+            {
+                "model_name": "a",
+                "category": "overall",
+                "rating": 1500,
+                "rating_lower": 1495,
+                "rating_upper": 1505,
+            },
+            {
+                "model_name": "a",
+                "category": "coding",
+                "rating": 1480,
+                "rating_lower": 1475,
+                "rating_upper": 1485,
+            },
         ]
         aa_models = [
             {"name": "a", "intelligence_index": 60, "coding_index": 55},
