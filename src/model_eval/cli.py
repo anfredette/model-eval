@@ -76,6 +76,47 @@ def generate_output_path(model_names: list[str]) -> Path:
     return REPORTS_DIR / f"{base}_{max_n + 1:02d}.md"
 
 
+def parse_weights(weights_str: str) -> tuple[float, float]:
+    """Parse 'arena=N,aa=N' into normalized (arena_weight, aa_weight).
+
+    Values are pure weights — normalized by dividing each by the sum.
+    Raises click.UsageError on invalid input.
+    """
+    VALID_SOURCES = {"arena", "aa"}
+    parsed: dict[str, float] = {}
+
+    for part in weights_str.split(","):
+        part = part.strip()
+        if "=" not in part:
+            raise click.UsageError(
+                f"Invalid weight format '{part}'. Expected 'source=value', "
+                f"e.g., 'arena=50,aa=50'."
+            )
+        key, val_str = part.split("=", 1)
+        key = key.strip().lower()
+        if key not in VALID_SOURCES:
+            raise click.UsageError(
+                f"Unknown source '{key}'. Valid sources: {', '.join(sorted(VALID_SOURCES))}."
+            )
+        try:
+            val = float(val_str.strip())
+        except ValueError:
+            raise click.UsageError(f"Weight for '{key}' must be a number, got '{val_str.strip()}'.")
+        if val <= 0:
+            raise click.UsageError(f"Weight for '{key}' must be positive, got {val}.")
+        parsed[key] = val
+
+    missing = VALID_SOURCES - parsed.keys()
+    if missing:
+        raise click.UsageError(
+            f"Missing weight for: {', '.join(sorted(missing))}. "
+            f"Provide all sources, e.g., 'arena=50,aa=50'."
+        )
+
+    total = sum(parsed.values())
+    return parsed["arena"] / total, parsed["aa"] / total
+
+
 def build_scorecards(
     model_names: list[str],
     arena_rows: list[dict[str, Any]],
@@ -193,6 +234,12 @@ def build_scorecards(
     default=False,
     help="Accept fuzzy model name matches instead of treating them as not-found.",
 )
+@click.option(
+    "--weights",
+    "-w",
+    default="arena=50,aa=50",
+    help="Source weights, e.g., 'arena=60,aa=40' (default: arena=50,aa=50).",
+)
 @click.option("--verbose", "-v", is_flag=True, help="Verbose output.")
 @click.pass_context
 def main(
@@ -204,6 +251,7 @@ def main(
     aa_data: str | None,
     pdf: bool,
     fuzzy: bool,
+    weights: str,
     verbose: bool,
 ) -> None:
     """Evaluate and compare LLM models using data from multiple sources."""
@@ -217,6 +265,8 @@ def main(
         level=logging.DEBUG if verbose else logging.INFO,
         format="%(levelname)s: %(message)s",
     )
+
+    arena_weight, aa_weight = parse_weights(weights)
 
     model_names = [m.strip() for m in models.split(",") if m.strip()]
     if not model_names:
@@ -378,8 +428,8 @@ def sync_arena(verbose: bool) -> None:
 @click.option(
     "--weights",
     "-w",
-    default="50/50",
-    help="Arena/AA weight ratio (default: 50/50).",
+    default="arena=50,aa=50",
+    help="Source weights, e.g., 'arena=60,aa=40' (default: arena=50,aa=50).",
 )
 @click.option(
     "--all-categories",
@@ -417,18 +467,7 @@ def scores_command(
 
     model_names = _get_model_names(models, catalog)
 
-    parts = weights.split("/")
-    if len(parts) != 2:
-        raise click.UsageError("Weights must be in format 'arena/aa', e.g., '60/40'.")
-    try:
-        arena_w, aa_w = float(parts[0]), float(parts[1])
-    except ValueError as e:
-        raise click.UsageError("Weights must be numeric, e.g., '60/40'.") from e
-    total = arena_w + aa_w
-    if total == 0:
-        raise click.UsageError("Weights cannot both be zero.")
-    arena_weight = arena_w / total
-    aa_weight = aa_w / total
+    arena_weight, aa_weight = parse_weights(weights)
 
     arena_rows, arena_fetched = arena_client.load_cache()
     aa_models, aa_fetched = aa_client.load_cache()
@@ -519,7 +558,7 @@ def scores_command(
     prov_labels = {"both": "B", "arena_only": "A", "aa_only": "AA", "none": "?"}
 
     summary = Table(
-        title=f"Overall (Arena {arena_w:.0f}% / AA {aa_w:.0f}%)",
+        title=f"Overall (Arena {arena_weight * 100:.0f}% / AA {aa_weight * 100:.0f}%)",
         show_lines=True,
     )
     summary.add_column("Model", style="bold")
