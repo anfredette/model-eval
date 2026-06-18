@@ -112,7 +112,7 @@ When both sources have data for a model in a category, the composite score is a 
 composite = arena_weight × arena_percentile + aa_weight × aa_percentile
 ```
 
-Default weights are 50/50, configurable via `--weights`. When only one source has data, the composite equals that source's percentile.
+Default weights are `arena=50,aa=50`, configurable via `--weights arena=60,aa=40`. Values are pure weights, normalized internally. When only one source has data, the composite equals that source's percentile.
 
 ### Provenance Flags
 
@@ -120,6 +120,59 @@ Each score carries a provenance flag indicating which sources contributed:
 - `[B]` — Both sources (composited)
 - `[A]` — Arena only
 - `[AA]` — AA only
+- `[M]` — Mixed (in category findings where some models have both sources and others have only one)
+
+## Tiers and Gap Significance
+
+### Tier Classification
+
+Models are classified into tiers for quick positioning. Two tier systems are used depending on context:
+
+**Rank-based tiers** (used in per-source Key Findings):
+
+| Tier | Rank Range |
+|---|---|
+| Frontier | 1–10 |
+| Near-frontier | 11–25 |
+| Upper-mid | 26–75 |
+| Mid-tier | 76–150 |
+| Long-tail | 151+ |
+
+**Percentile-based tiers** (used in Composite Scores and Category Analysis):
+
+| Tier | Percentile Range |
+|---|---|
+| Frontier | ≥95th |
+| Near-frontier | 85th–94th |
+| Upper-mid | 50th–84th |
+| Mid-tier | 15th–49th |
+| Long-tail | Below 15th |
+
+### Gap Significance
+
+Gap descriptions vary by context:
+
+**Composite percentile gaps** (used in Category Analysis findings):
+
+| Gap | Description |
+|---|---|
+| <5 percentile points | Effectively equivalent |
+| 5–15 percentile points | Moderate advantage |
+| >15 percentile points | Clear separation |
+
+**Arena gaps** (per-source findings): Based on confidence interval overlap — "statistically indistinguishable" (CIs overlap), "small but statistically significant difference" (CIs don't overlap, gap <20 points), or "clear separation" (gap ≥20 points).
+
+**AA gaps** (per-source findings): Based on gap relative to population standard deviation — "not clearly distinguishable" (<0.5σ), "moderate difference" (0.5–1.0σ), or "clear separation" (>1.0σ).
+
+## Report Features
+
+### Composite Percentile Chart
+
+Reports include a composite percentile distribution chart showing where each model falls on a 0–100 percentile scale, with tier bands marked visually. This provides a quick visual summary of model positioning.
+
+### Category Findings
+
+The Category Analysis section provides structured findings for each category, ranking all models by composite percentile and describing the gap significance between them. Each finding includes a provenance flag indicating which sources contributed data for that category.
 
 ## Category Taxonomy
 
@@ -130,7 +183,7 @@ model-eval defines 34 unified categories across both sources:
 | Composited (both sources) | 3 | Arena + AA | overall, coding, math |
 | General | 4 | Arena only | creative_writing, instruction_following, hard_prompts, expert |
 | Interaction | 2 | Arena only | multi_turn, longer_query |
-| Industry | 7 | Arena only | software/IT, legal, science, healthcare, etc. |
+| Industry | 8 | Arena only | software/IT, legal, science, math, writing, business/finance, entertainment, healthcare |
 | Language | 8 | Arena only | english, chinese, french, japanese, etc. |
 | Other Arena | 2 | Arena only | hard_prompts_english, exclude_ties |
 | AA Benchmarks | 7 | AA only | GPQA, HLE, SciCode, LiveCodeBench, MMLU-Pro, MATH-500, AIME |
@@ -153,19 +206,17 @@ Applied as a multiplicative factor to the raw score:
 
 These factors are from empirical measurements in llm-d-planner.
 
-### Reasoning/Thinking Deltas
+### Reasoning/Instruct Variant Flagging
 
-Computed empirically from paired models in the cached data where both reasoning and non-reasoning variants exist:
-- **AA Intelligence Index**: Median delta +5.0 (from 66 paired models)
-- **Arena Elo**: Median delta +3.7 (from 16 paired models)
+When the resolver matches across variant boundaries (e.g., a reasoning model matched to a non-reasoning variant's scores, or an instruct model matched to a base variant), the system flags the mismatch descriptively but does **not** apply a numerical adjustment. The variant description appears in confidence indicators (see below).
+
+The codebase includes functions to compute empirical reasoning deltas from paired models (`compute_reasoning_deltas()`, `compute_arena_thinking_delta()` in `variants.py`), but these are not currently wired into the scoring pipeline.
 
 ### Bidirectional Adjustments
 
-All adjustments work in both directions:
+Quantization adjustments work in both directions:
 - Have full-precision, want quantized → multiply by discount
 - Have quantized, want full-precision → divide by discount
-- Have base, want reasoning → add delta
-- Have reasoning, want base → subtract delta
 
 ### Confidence Indicators
 
@@ -211,7 +262,7 @@ model-eval check --catalog path/to/model_catalog.json --fuzzy
 model-eval scores -m "claude-opus-4-6,gemini-2.5-pro"
 
 # Custom Arena/AA weighting
-model-eval scores -m "model1,model2" --weights 60/40
+model-eval scores -m "model1,model2" --weights arena=60,aa=40
 
 # Show all 34 categories
 model-eval scores -m "model1" --all-categories
