@@ -143,7 +143,7 @@ def compute_composite(
     )
 
 
-def _apply_variant_adjustment(
+def apply_variant_adjustment(
     score: NormalizedScore, user_name: str, matched_name: str
 ) -> NormalizedScore:
     factor, description = detect_variant_delta(user_name, matched_name)
@@ -156,14 +156,16 @@ def _apply_variant_adjustment(
     return adjusted
 
 
-def compute_scorecards(
+def compute_normalizations(
     arena_rows: list[dict[str, Any]],
     aa_models: list[dict[str, Any]],
-    target_models: list[tuple[str, str | None, str | None]],
     categories: list[str],
-    arena_weight: float = 0.5,
-    aa_weight: float = 0.5,
-) -> list[ModelScorecard]:
+) -> tuple[dict[str, dict[str, NormalizedScore]], dict[str, dict[str, NormalizedScore]]]:
+    """Compute per-category normalizations across the full population.
+
+    Returns (arena_norms, aa_norms) where each is
+    ``{category: {model_name: NormalizedScore}}``.
+    """
     arena_norms: dict[str, dict[str, NormalizedScore]] = {}
     aa_norms: dict[str, dict[str, NormalizedScore]] = {}
 
@@ -173,12 +175,23 @@ def compute_scorecards(
         arena_cat, aa_field = CATEGORY_MAP.get(cat, (None, None))
 
         if arena_cat and arena_cat in arena_by_category:
-            norms = normalize_arena_category(arena_by_category[arena_cat], arena_cat)
-            arena_norms[cat] = norms
+            arena_norms[cat] = normalize_arena_category(arena_by_category[arena_cat], arena_cat)
 
         if aa_field:
-            norms = normalize_aa_index(aa_models, aa_field)
-            aa_norms[cat] = norms
+            aa_norms[cat] = normalize_aa_index(aa_models, aa_field)
+
+    return arena_norms, aa_norms
+
+
+def compute_scorecards(
+    arena_rows: list[dict[str, Any]],
+    aa_models: list[dict[str, Any]],
+    target_models: list[tuple[str, str | None, str | None]],
+    categories: list[str],
+    arena_weight: float = 0.5,
+    aa_weight: float = 0.5,
+) -> list[ModelScorecard]:
+    arena_norms, aa_norms = compute_normalizations(arena_rows, aa_models, categories)
 
     scorecards: list[ModelScorecard] = []
     for display_name_str, arena_name, aa_name in target_models:
@@ -187,9 +200,9 @@ def compute_scorecards(
             a_score = arena_norms.get(cat, {}).get(arena_name) if arena_name else None
             aa_score = aa_norms.get(cat, {}).get(aa_name) if aa_name else None
             if a_score and arena_name:
-                a_score = _apply_variant_adjustment(a_score, display_name_str, arena_name)
+                a_score = apply_variant_adjustment(a_score, display_name_str, arena_name)
             if aa_score and aa_name:
-                aa_score = _apply_variant_adjustment(aa_score, display_name_str, aa_name)
+                aa_score = apply_variant_adjustment(aa_score, display_name_str, aa_name)
             if a_score or aa_score:
                 cat_scores[cat] = compute_composite(cat, a_score, aa_score, arena_weight, aa_weight)
 
