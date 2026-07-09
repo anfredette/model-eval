@@ -1,4 +1,4 @@
-# Scoring Guide
+# Quality Scoring Guide
 
 model-eval compares LLM models by normalizing scores from multiple benchmark sources onto a common scale, then compositing them into a single rating. This guide explains how each piece works.
 
