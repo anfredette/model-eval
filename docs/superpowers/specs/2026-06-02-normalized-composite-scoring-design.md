@@ -190,7 +190,7 @@ Require model family name to match before accepting fuzzy matches. Add subset to
 Bring planner's quantization discounts into model-eval. Compute empirical instruct/reasoning uplift from paired data. Add confidence indicators to scores.
 
 ### 3. User-facing documentation
-Create a user-facing document (`docs/scoring-guide.md`) explaining:
+Create a user-facing document (`docs/quality-scoring-guide.md`) explaining:
 - The two data sources (Arena human preference vs AA automated benchmarks) and what they measure
 - How model names are resolved across sources (the 12-step pipeline)
 - How scores are normalized (tied-rank percentile) and why
