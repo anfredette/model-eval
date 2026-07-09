@@ -10,7 +10,7 @@ model-eval uses two independent data sources that measure model quality in funda
 
 [Arena](https://lmarena.ai/) (formerly LMSYS Chatbot Arena) ranks models using **human preference judgments**. Real users interact with pairs of anonymous models and vote for the one they prefer. Votes are aggregated into Bradley-Terry Elo ratings.
 
-- **Score range**: ~700–1555 (Elo-style ratings)
+- **Score range**: ~700–1550 (Elo-style ratings)
 - **Categories**: 27, including general (coding, math, creative writing, instruction following) and industry-specific (legal, science, software/IT, healthcare, etc.), plus 8 language-specific categories
 - **Confidence intervals**: Each rating has lower/upper bounds reflecting statistical uncertainty
 - **Strengths**: Captures subjective qualities — helpfulness, writing style, conversational fluency
@@ -24,7 +24,8 @@ Data is fetched from the HuggingFace dataset `lmarena-ai/leaderboard-dataset` vi
 
 - **Score range**: 0–100 for aggregate indices; 0–1 for individual benchmarks
 - **Aggregate indices**: Intelligence Index (overall), Coding Index, Math Index
-- **Individual benchmarks** (7): GPQA Diamond (science), Humanity's Last Exam (cross-domain), SciCode (scientific coding), LiveCodeBench (coding), MMLU-Pro (language understanding), MATH-500 (math), AIME (competition math)
+- **Intelligence Index (v4.0)** aggregates scores from 10 evaluations: GPQA Diamond (science), Humanity's Last Exam (cross-domain), SciCode (scientific coding), Terminal-Bench Hard (CLI tasks), IFBench (instruction following), AA-LCR (long-context retrieval), AA-Omniscience (broad knowledge), GDPval-AA (quantitative reasoning), tau2-Bench Telecom (agent tasks), CritPt (critical thinking). See [AA's methodology](https://artificialanalysis.ai/methodology) for the current composition — AA may update this list over time.
+- **Individually tracked benchmarks** (7): model-eval tracks these as separate per-model scores: GPQA Diamond, Humanity's Last Exam, SciCode, LiveCodeBench, MMLU-Pro, MATH-500, AIME. Three of these (GPQA Diamond, HLE, SciCode) are also part of the Intelligence Index v4.0; the other four are independent benchmarks not included in the index.
 - **Strengths**: Precise for measurable capabilities; reproducible; covers specific skill areas
 - **Limitations**: Less reflective of subjective qualities like writing style or helpfulness
 
@@ -58,13 +59,13 @@ The resolver tries 13 strategies in order, returning the first match:
 | 12 | Fuzzy | Version-adjacent (closest version number with same base) |
 | 13 | Fuzzy | Normalized substring |
 
-All fuzzy steps (8–13) require the **model family name** to match. Family names are extracted as the first alphabetic token after org stripping (e.g., `llama`, `qwen`, `mistral`, `granite`). This prevents cross-family false matches like `qwen-7b-instruct` matching `mistral-7b-instruct`.
+Fuzzy steps 10, 11, and 13 require the **model family name** to match. Family names are extracted as the first alphabetic token after org stripping (e.g., `llama`, `qwen`, `mistral`, `granite`). This prevents cross-family false matches like `qwen-7b-instruct` matching `mistral-7b-instruct`. Steps 8–9 (suffix-stripped matching) have no family check. Step 12 (version-adjacent) uses parsed version base comparison instead of family extraction.
 
 ### Token Filtering
 
 Token-set matching filters out noise tokens to improve matching:
-- **Quantization tokens**: `fp8`, `dynamic`, `nvfp4`, `hf`
-- **Date suffixes**: 4-digit YYMM patterns (e.g., `2501`, `2503`)
+- **Quantization tokens**: `fp8`, `dynamic`, `nvfp4`, `hf`, and any token starting with `quantized` (e.g., `quantized.w4a16`, `quantized.w8a8`)
+- **Date suffixes**: YYMM patterns for years 2024–2029 (e.g., `2501`, `2903`)
 - **Numeric token ordering**: Pure digit tokens preserve their original order (`4-6` does not match `6-4`), while other tokens are order-independent
 
 ### Org Prefix Stripping
@@ -80,7 +81,7 @@ This list requires periodic review when new models or vendors appear. Check Aren
 ## Score Normalization
 
 Arena and AA use incompatible score ranges with very different distributions:
-- Arena Elo ratings span ~700–1555 with mild top-compression
+- Arena Elo ratings span ~700–1550 with mild top-compression
 - AA intelligence/coding indices are 0–100 but severely bottom-compressed (95% of models score below 50)
 
 ### Tied-Rank Percentile
@@ -98,7 +99,7 @@ A percentile of 85.0 means "this model scores higher than 85% of all models in t
 Tie grouping prevents inflating meaningless score differences:
 
 - **Arena**: Two models are tied if their confidence intervals overlap bidirectionally (`A.upper >= B.lower AND B.upper >= A.lower`). Uses the anchor model's CI — each new model is compared against the group's first (highest-rated) model, not the previous one.
-- **AA**: Two models are tied if their scores are within `0.1 × population standard deviation` of the group anchor.
+- **AA**: Two models are tied if their scores are within `0.1 × standard deviation` of the group anchor.
 
 ### Population-Level Normalization
 
@@ -116,11 +117,12 @@ Default weights are `arena=50,aa=50`, configurable via `--weights arena=60,aa=40
 
 ### Provenance Flags
 
-Each score carries a provenance flag indicating which sources contributed:
+Each score carries a provenance flag indicating which sources contributed. The composite scores table uses short codes:
 - `[B]` — Both sources (composited)
 - `[A]` — Arena only
 - `[AA]` — AA only
-- `[M]` — Mixed (in category findings where some models have both sources and others have only one)
+
+Category findings use full-word labels: `[Both]`, `[Arena Only]`, `[AA Only]`, `[Mixed]`. The "Mixed" label appears when some models in a category have both sources and others have only one.
 
 ## Tiers and Gap Significance
 
@@ -168,7 +170,27 @@ Gap descriptions vary by context:
 
 ### Composite Percentile Chart
 
-Reports include a composite percentile distribution chart showing where each model falls on a 0–100 percentile scale, with tier bands marked visually. This provides a quick visual summary of model positioning.
+Reports include a composite percentile chart — a horizontal scale from 0–100 with tier bands marked visually and arrow markers showing each model's position. This provides a quick visual summary of model positioning across tiers.
+
+### Per-Source Distribution Charts
+
+Each data source (Arena, AA) generates a histogram showing the full population score distribution with staggered arrow markers for the evaluated models. These show where models fall within the source's overall population.
+
+### Composite Scores Table
+
+The main summary table shows all models' percentile scores grouped by category group (General Capabilities, Industry, Benchmarks), with provenance flags and the active Arena/AA weighting displayed in the header.
+
+### Model Detail Cards
+
+Each model gets a detail card showing Arena raw score, Arena percentile, AA raw score, AA percentile, composite percentile, and source provenance for every category. Cards also display match type information and fuzzy-match warnings where applicable.
+
+### Head-to-Head Comparisons
+
+When comparing models, the report includes per-dimension delta tables with a winner column. Deltas exceeding 25 points are bolded.
+
+### Per-Source Key Findings
+
+Each data source generates its own findings section with contextual analysis — overall positioning, head-to-head summaries, strengths/weaknesses, and profile differences (STEM vs. humanities leanings).
 
 ### Category Findings
 
@@ -208,7 +230,7 @@ These factors are from empirical measurements in llm-d-planner.
 
 ### Reasoning/Instruct Variant Flagging
 
-When the resolver matches across variant boundaries (e.g., a reasoning model matched to a non-reasoning variant's scores, or an instruct model matched to a base variant), the system flags the mismatch descriptively but does **not** apply a numerical adjustment. The variant description appears in confidence indicators (see below).
+When the resolver matches across variant boundaries (e.g., a reasoning or thinking model matched to a non-reasoning variant's scores, or an instruct model matched to a base variant), the system flags the mismatch descriptively but does **not** apply a numerical adjustment. The variant detection matches both "reasoning" and "thinking" keywords. The variant description appears in confidence indicators (see below).
 
 The codebase includes functions to compute empirical reasoning deltas from paired models (`compute_reasoning_deltas()`, `compute_arena_thinking_delta()` in `variants.py`), but these are not currently wired into the scoring pipeline.
 
@@ -253,6 +275,9 @@ model-eval check -m "Llama-3.1-70B-Instruct-FP8" --fuzzy
 
 # Check all models from a catalog file
 model-eval check --catalog path/to/model_catalog.json --fuzzy
+
+# Check against specific sources only
+model-eval check -m "model1" -s arena
 ```
 
 ### View Scores
@@ -282,4 +307,17 @@ model-eval -m "claude-opus-4-6,gpt-4o" -s arena,artificial_analysis
 
 # Generate PDF
 model-eval -m "model1,model2" --pdf
+
+# Treat names as family prefixes (matches all variants)
+model-eval -m "qwen,llama" --families
+
+# Custom output path (auto-generates in reports/ if not set)
+model-eval -m "model1,model2" -o path/to/output.md
+
+# Use custom AA data file (bypasses cache)
+model-eval -m "model1,model2" --aa-data path/to/aa_data.json
 ```
+
+## ScoringEngine API
+
+The `ScoringEngine` class in `engine.py` provides the primary programmatic API for external consumers (e.g., llm-d-planner). It pre-computes normalizations across the full population once, then supports cheap per-model lookups via `get_scores()` and `get_scores_batch()`. The CLI delegates to it internally.
