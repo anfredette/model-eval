@@ -3,22 +3,23 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, model_validator
+from quality_scoring import MatchType, aa_client
+from quality_scoring.resolver import MatchResult, resolve_model_names, suggest_similar
+from quality_scoring.tiers import aa_gap_significance, tier_label
 
-from model_eval import aa_client
+from model_eval import CACHE_DIR
 from model_eval.models import (
     ComparisonTable,
     DistributionStats,
-    MatchType,
     ResolutionReport,
     SourceData,
 )
-from model_eval.resolver import MatchResult, resolve_model_names, suggest_similar
 from model_eval.sources import register_source
-from model_eval.tiers import aa_gap_significance, tier_label
 
 logger = logging.getLogger(__name__)
 
@@ -50,48 +51,44 @@ deployment perspective."""
 
 
 class AAModel(BaseModel):
+    """Flattens the V2 API nested structure into a flat model."""
+
+    model_config = ConfigDict(extra="ignore")
+
     name: str
     slug: str
-    organization: str
+    organization: str = "Unknown"
     intelligence_index: int | None = None
     coding_index: int | None = None
-    math_index: int | None = None
-    mmlu_pro: float | None = None
-    gpqa: float | None = None
-    hle: float | None = None
-    livecodebench: float | None = None
-    scicode: float | None = None
-    math_500: float | None = None
-    aime: float | None = None
+    agentic_index: int | None = None
     speed_tps: float | None = None
     ttft_s: float | None = None
     input_price_per_1m: float | None = None
     output_price_per_1m: float | None = None
-    blended_price_api: float | None = None
-    context_window: int | None = None
-    params_total_b: float | None = None
-    params_active_b: float | None = None
-    reasoning: bool = False
-    url: str | None = None
-    accessed_date: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def flatten_nested(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        creator = data.get("model_creator")
+        if isinstance(creator, dict):
+            data.setdefault("organization", creator.get("name", "Unknown"))
+        perf = data.get("performance")
+        if isinstance(perf, dict):
+            data.setdefault("speed_tps", perf.get("median_output_tokens_per_second"))
+            data.setdefault("ttft_s", perf.get("median_time_to_first_token_seconds"))
+        pricing = data.get("pricing")
+        if isinstance(pricing, dict):
+            data.setdefault("input_price_per_1m", pricing.get("price_1m_input_tokens"))
+            data.setdefault("output_price_per_1m", pricing.get("price_1m_output_tokens"))
+        return data
 
     @property
     def blended_price(self) -> float | None:
-        if self.blended_price_api is not None:
-            return self.blended_price_api
         if self.input_price_per_1m is not None and self.output_price_per_1m is not None:
             return round((3 * self.input_price_per_1m + self.output_price_per_1m) / 4, 2)
         return None
-
-    @property
-    def params_display(self) -> str:
-        if self.params_total_b is None:
-            return "proprietary"
-        total = f"{self.params_total_b:g}B"
-        if self.params_active_b and self.params_active_b != self.params_total_b:
-            active = f"{self.params_active_b:g}B"
-            return f"{total} / {active}"
-        return total
 
 
 def _load_models(data_path: Path | None) -> tuple[list[AAModel], str]:
@@ -100,7 +97,7 @@ def _load_models(data_path: Path | None) -> tuple[list[AAModel], str]:
             raw = json.load(f)
         status = f"loaded from {data_path}"
     else:
-        raw, fetched_at = aa_client.load_cache()
+        raw, fetched_at = aa_client.load_cache(cache_dir=CACHE_DIR)
         if not raw:
             api_key = os.environ.get("AA_API_KEY")
             if not api_key:
@@ -111,20 +108,20 @@ def _load_models(data_path: Path | None) -> tuple[list[AAModel], str]:
                 )
             logger.info("No Artificial Analysis cache found, fetching from API...")
             try:
-                count, _ = aa_client.sync(api_key)
+                count, _ = aa_client.sync(api_key, cache_dir=CACHE_DIR)
                 logger.info("Synced %d models from Artificial Analysis API", count)
             except RuntimeError as e:
                 raise RuntimeError(f"Artificial Analysis auto-sync failed: {e}") from e
-            raw, fetched_at = aa_client.load_cache()
+            raw, fetched_at = aa_client.load_cache(cache_dir=CACHE_DIR)
             status = "fetched from API"
         elif aa_client.is_cache_stale(fetched_at):
             api_key = os.environ.get("AA_API_KEY")
             if api_key:
                 logger.info("Artificial Analysis cache is stale, refreshing from API...")
                 try:
-                    count, _ = aa_client.sync(api_key)
+                    count, _ = aa_client.sync(api_key, cache_dir=CACHE_DIR)
                     logger.info("Synced %d models from Artificial Analysis API", count)
-                    raw, fetched_at = aa_client.load_cache()
+                    raw, fetched_at = aa_client.load_cache(cache_dir=CACHE_DIR)
                     status = "refreshed from API"
                 except Exception:
                     age = aa_client.cache_age_display(fetched_at) if fetched_at else "unknown"
@@ -167,7 +164,9 @@ def _match_models(
 ) -> tuple[list[AAModel], list[str], dict[str, str], dict[str, str], dict[str, list[str]]]:
     """Returns (matched_models, not_found, family_map, match_details, fuzzy_suggestions)."""
     if families:
-        from model_eval.resolver import _normalize
+
+        def _normalize(s: str) -> str:
+            return re.sub(r"[^a-z0-9]", "", s.lower())
 
         matched: list[AAModel] = []
         not_found_families: list[str] = []
@@ -232,40 +231,31 @@ def _match_models(
     return found, not_found_names, {}, match_details, fuzzy_suggestions
 
 
-def _comparison_table(
-    models: list[AAModel], *, title: str, include_params: bool = True
-) -> ComparisonTable:
+def _comparison_table(models: list[AAModel], *, title: str) -> ComparisonTable:
     sorted_models = sorted(models, key=lambda m: m.intelligence_index or 0, reverse=True)
 
     has_coding = any(m.coding_index is not None for m in sorted_models)
-    has_math = any(m.math_index is not None for m in sorted_models)
+    has_agentic = any(m.agentic_index is not None for m in sorted_models)
 
-    headers: list[str] = ["Model"]
-    if include_params:
-        headers.append("Params (total/active)")
-    headers.append("AA Intelligence")
+    headers: list[str] = ["Model", "AA Intelligence"]
     if has_coding:
         headers.append("Coding")
-    if has_math:
-        headers.append("Math")
-    headers.extend(["Speed (t/s)", "TTFT (s)", "Price ($/1M blend)", "Context"])
+    if has_agentic:
+        headers.append("Agentic")
+    headers.extend(["Speed (t/s)", "TTFT (s)", "Price ($/1M blend)"])
 
     rows: list[list[str]] = []
     for m in sorted_models:
         speed = f"{m.speed_tps:.1f}" if m.speed_tps else "--"
         ttft = f"{m.ttft_s:.2f}" if m.ttft_s else "--"
         price = f"${m.blended_price:.2f}" if m.blended_price else "--"
-        ctx = f"{m.context_window // 1000}k" if m.context_window else "--"
 
-        row: list[str] = [m.name]
-        if include_params:
-            row.append(m.params_display)
-        row.append(str(m.intelligence_index))
+        row: list[str] = [m.name, str(m.intelligence_index)]
         if has_coding:
             row.append(str(m.coding_index) if m.coding_index is not None else "--")
-        if has_math:
-            row.append(str(m.math_index) if m.math_index is not None else "--")
-        row.extend([speed, ttft, price, ctx])
+        if has_agentic:
+            row.append(str(m.agentic_index) if m.agentic_index is not None else "--")
+        row.extend([speed, ttft, price])
         rows.append(row)
 
     return ComparisonTable(
@@ -357,7 +347,7 @@ def _compute_findings(
     sorted_all = sorted(all_models, key=lambda m: m.intelligence_index or 0, reverse=True)
     total = len(sorted_all)
 
-    dist_cache = aa_client.load_dist_cache()
+    dist_cache = aa_client.load_dist_cache(cache_dir=CACHE_DIR)
     dist_stats: DistributionStats | None = None
     population_stdev = 0.0
     if dist_cache and "stats" in dist_cache:
@@ -387,18 +377,10 @@ def _compute_findings(
             tier_str = f", {tier_label(rank)} tier"
         else:
             rank_str = ""
-        reasoning_models = [m for m in models if m.reasoning]
-        non_reasoning_models = [m for m in models if not m.reasoning]
-        parts = []
-        if reasoning_models:
-            parts.append(f"{len(reasoning_models)} reasoning")
-        if non_reasoning_models:
-            parts.append(f"{len(non_reasoning_models)} non-reasoning")
-        variant_str = f" ({', '.join(parts)})" if parts else ""
         findings.append(
             f"**{org}:** Top model is {best.name} "
             f"(Intelligence Index: {best.intelligence_index}{rank_str}){tier_str}. "
-            f"{len(models)} model(s) evaluated{variant_str}."
+            f"{len(models)} model(s) evaluated."
         )
 
     if len(orgs) >= 2:
@@ -438,41 +420,15 @@ def _compute_findings(
                 f"{lower_c.name} at {lower_c.coding_index} ({gap} points, {gap_desc})."
             )
 
-        if a_best.math_index is not None and b_best.math_index is not None:
-            higher_m = a_best if a_best.math_index > b_best.math_index else b_best
-            lower_m = b_best if higher_m == a_best else a_best
-            assert higher_m.math_index is not None and lower_m.math_index is not None
-            gap = higher_m.math_index - lower_m.math_index
-            gap_desc = aa_gap_significance(
-                float(higher_m.math_index),
-                float(lower_m.math_index),
-                population_stdev,
-            )
-            findings.append(
-                f"**Math:** {higher_m.name} leads with Math Index {higher_m.math_index} vs "
-                f"{lower_m.name} at {lower_m.math_index} ({gap} points, {gap_desc})."
-            )
-
         if a_best.speed_tps and b_best.speed_tps:
             faster = a_best if a_best.speed_tps > b_best.speed_tps else b_best
             slower = b_best if faster == a_best else a_best
             assert faster.speed_tps and slower.speed_tps
             ratio = faster.speed_tps / slower.speed_tps
             qualifier = _ratio_qualifier(ratio)
-            explanation = ""
-            if (
-                faster.params_active_b
-                and slower.params_active_b
-                and faster.params_active_b < slower.params_active_b
-            ):
-                explanation = (
-                    f" This is likely due to {faster.name}'s smaller active parameter "
-                    f"count ({faster.params_active_b:g}B active vs "
-                    f"{slower.params_active_b:g}B active)."
-                )
             findings.append(
                 f"**Speed:** {faster.name} is {qualifier} faster at {ratio:.1f}x "
-                f"({faster.speed_tps:.0f} vs {slower.speed_tps:.0f} t/s).{explanation}"
+                f"({faster.speed_tps:.0f} vs {slower.speed_tps:.0f} t/s)."
             )
 
         if a_best.ttft_s and b_best.ttft_s:
@@ -495,36 +451,6 @@ def _compute_findings(
             findings.append(
                 f"**Price:** {cheaper.name} is {qualifier} cheaper at {ratio:.1f}x "
                 f"(${cheaper.blended_price:.2f} vs ${pricier.blended_price:.2f}/1M blended tokens)."
-            )
-
-        a_ctx = a_best.context_window
-        b_ctx = b_best.context_window
-        if a_ctx and b_ctx and a_ctx != b_ctx:
-            larger = a_best if a_ctx > b_ctx else b_best
-            smaller = b_best if larger == a_best else a_best
-            assert larger.context_window is not None and smaller.context_window is not None
-            ratio = larger.context_window / smaller.context_window
-            findings.append(
-                f"**Context window:** {larger.name} offers {larger.context_window // 1000}k "
-                f"tokens vs {smaller.context_window // 1000}k for {smaller.name}"
-                f" ({ratio:.0f}x larger)."
-            )
-
-        if (
-            a_best.params_total_b
-            and b_best.params_total_b
-            and a_best.params_active_b
-            and b_best.params_active_b
-            and (
-                a_best.params_active_b != a_best.params_total_b
-                or b_best.params_active_b != b_best.params_total_b
-            )
-        ):
-            findings.append(
-                f"**Parameter efficiency:** {a_best.name} has "
-                f"{a_best.params_total_b:g}B total / {a_best.params_active_b:g}B active; "
-                f"{b_best.name} has {b_best.params_total_b:g}B total / "
-                f"{b_best.params_active_b:g}B active."
             )
 
     return findings, dist_stats
@@ -585,20 +511,7 @@ class ArtificialAnalysisSource:
 
         global_rankings = [_consolidated_ranking_table(all_models, matched)]
 
-        comparison_tables: list[ComparisonTable] = []
-
-        reasoning = [m for m in matched if m.reasoning]
-        non_reasoning = [m for m in matched if not m.reasoning]
-
-        if reasoning:
-            comparison_tables.append(_comparison_table(reasoning, title="Reasoning Models"))
-        if non_reasoning:
-            comparison_tables.append(_comparison_table(non_reasoning, title="Non-Reasoning Models"))
-
-        if reasoning and non_reasoning:
-            comparison_tables.append(
-                _comparison_table(matched, title="All Models", include_params=False)
-            )
+        comparison_tables = [_comparison_table(matched, title="All Models")]
 
         findings, dist_stats = _compute_findings(matched, all_models)
 

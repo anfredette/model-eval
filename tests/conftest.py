@@ -75,10 +75,6 @@ def sample_aa_models() -> list[AAModel]:
             ttft_s=1.0,
             input_price_per_1m=0.20,
             output_price_per_1m=0.80,
-            context_window=512000,
-            params_total_b=400,
-            params_active_b=13,
-            reasoning=True,
         ),
         AAModel(
             name="Beta Large",
@@ -89,10 +85,6 @@ def sample_aa_models() -> list[AAModel]:
             ttft_s=2.9,
             input_price_per_1m=1.20,
             output_price_per_1m=4.80,
-            context_window=256000,
-            params_total_b=235,
-            params_active_b=22,
-            reasoning=True,
         ),
         AAModel(
             name="Beta Small",
@@ -103,9 +95,5 @@ def sample_aa_models() -> list[AAModel]:
             ttft_s=2.5,
             input_price_per_1m=0.60,
             output_price_per_1m=2.40,
-            context_window=33000,
-            params_total_b=33,
-            params_active_b=33,
-            reasoning=False,
         ),
     ]

@@ -4,8 +4,8 @@ from datetime import date
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
+from quality_scoring import CATEGORY_GROUPS, DEFAULT_CATEGORIES, DISPLAY_NAMES
 
-from model_eval.categories import CATEGORY_GROUPS, DEFAULT_CATEGORIES, DISPLAY_NAMES
 from model_eval.models import ComparisonResult
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"

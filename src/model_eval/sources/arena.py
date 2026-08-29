@@ -4,20 +4,21 @@ import logging
 from typing import Any
 
 import pandas as pd
+from quality_scoring import MatchType, arena_client
+from quality_scoring.aa_client import cache_age_display
+from quality_scoring.cache import is_cache_stale
+from quality_scoring.resolver import resolve_model_names, suggest_similar
+from quality_scoring.tiers import arena_gap_significance, tier_label
 
-from model_eval import arena_client
-from model_eval.aa_client import cache_age_display, is_cache_stale
+from model_eval import CACHE_DIR
 from model_eval.models import (
     ComparisonTable,
     DistributionStats,
     HeadToHead,
-    MatchType,
     ResolutionReport,
     SourceData,
 )
-from model_eval.resolver import resolve_model_names, suggest_similar
 from model_eval.sources import register_source
-from model_eval.tiers import arena_gap_significance, tier_label
 
 logger = logging.getLogger(__name__)
 
@@ -91,19 +92,19 @@ def _short_cat(cat: str) -> str:
 
 
 def _fetch_arena() -> tuple[pd.DataFrame, str]:
-    rows, fetched_at = arena_client.load_cache()
+    rows, fetched_at = arena_client.load_cache(cache_dir=CACHE_DIR)
     if not rows:
         logger.info("No Arena cache found, fetching from HuggingFace...")
-        count, _ = arena_client.sync()
+        count, _ = arena_client.sync(cache_dir=CACHE_DIR)
         logger.info("Synced %d rows from Arena", count)
-        rows, fetched_at = arena_client.load_cache()
+        rows, fetched_at = arena_client.load_cache(cache_dir=CACHE_DIR)
         status = "fetched from HuggingFace"
     elif is_cache_stale(fetched_at):
         logger.info("Arena cache is stale, refreshing from HuggingFace...")
         try:
-            count, _ = arena_client.sync()
+            count, _ = arena_client.sync(cache_dir=CACHE_DIR)
             logger.info("Refreshed %d rows from Arena", count)
-            rows, fetched_at = arena_client.load_cache()
+            rows, fetched_at = arena_client.load_cache(cache_dir=CACHE_DIR)
             status = "refreshed from HuggingFace"
         except Exception:
             age = cache_age_display(fetched_at) if fetched_at else "unknown"
@@ -380,7 +381,7 @@ def _compute_findings(
     )
     total = len(overall)
 
-    dist_cache = arena_client.load_dist_cache()
+    dist_cache = arena_client.load_dist_cache(cache_dir=CACHE_DIR)
     dist_stats: DistributionStats | None = None
     if dist_cache and "stats" in dist_cache:
         s = dist_cache["stats"]

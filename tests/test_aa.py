@@ -28,18 +28,6 @@ class TestAAModel:
         )
         assert m.blended_price == 0.35
 
-    def test_blended_price_api_preferred(self) -> None:
-        m = AAModel(
-            name="Test",
-            slug="test",
-            organization="Org",
-            intelligence_index=30,
-            input_price_per_1m=0.20,
-            output_price_per_1m=0.80,
-            blended_price_api=0.50,
-        )
-        assert m.blended_price == 0.50
-
     def test_blended_price_none(self) -> None:
         m = AAModel(
             name="Test",
@@ -49,36 +37,29 @@ class TestAAModel:
         )
         assert m.blended_price is None
 
-    def test_params_display_moe(self) -> None:
+    def test_v2_nested_flattening(self) -> None:
+        """V2 API nested fields are flattened into top-level fields."""
         m = AAModel(
-            name="Test",
-            slug="test",
-            organization="Org",
-            intelligence_index=30,
-            params_total_b=399,
-            params_active_b=13,
+            **{
+                "name": "Test",
+                "slug": "test",
+                "model_creator": {"name": "TestOrg"},
+                "intelligence_index": 30,
+                "performance": {
+                    "median_output_tokens_per_second": 50.0,
+                    "median_time_to_first_token_seconds": 1.5,
+                },
+                "pricing": {
+                    "price_1m_input_tokens": 0.20,
+                    "price_1m_output_tokens": 0.80,
+                },
+            }
         )
-        assert m.params_display == "399B / 13B"
-
-    def test_params_display_dense(self) -> None:
-        m = AAModel(
-            name="Test",
-            slug="test",
-            organization="Org",
-            intelligence_index=30,
-            params_total_b=72,
-            params_active_b=72,
-        )
-        assert m.params_display == "72B"
-
-    def test_params_display_proprietary(self) -> None:
-        m = AAModel(
-            name="Test",
-            slug="test",
-            organization="Org",
-            intelligence_index=30,
-        )
-        assert m.params_display == "proprietary"
+        assert m.organization == "TestOrg"
+        assert m.speed_tps == 50.0
+        assert m.ttft_s == 1.5
+        assert m.input_price_per_1m == 0.20
+        assert m.output_price_per_1m == 0.80
 
 
 @pytest.mark.unit
@@ -241,13 +222,10 @@ class TestComparisonTable:
         table = _comparison_table(sample_aa_models, title="Test")
         assert table.rows[0][0] == "Alpha Thinking"
 
-    def test_headers_with_params(self, sample_aa_models: list[AAModel]) -> None:
-        table = _comparison_table(sample_aa_models, title="Test", include_params=True)
-        assert "Params (total/active)" in table.headers
-
-    def test_headers_without_params(self, sample_aa_models: list[AAModel]) -> None:
-        table = _comparison_table(sample_aa_models, title="Test", include_params=False)
-        assert "Params (total/active)" not in table.headers
+    def test_headers(self, sample_aa_models: list[AAModel]) -> None:
+        table = _comparison_table(sample_aa_models, title="Test")
+        assert "AA Intelligence" in table.headers
+        assert "Speed (t/s)" in table.headers
 
 
 @pytest.mark.unit
