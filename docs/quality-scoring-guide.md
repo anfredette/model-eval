@@ -23,9 +23,8 @@ Data is fetched from the HuggingFace dataset `lmarena-ai/leaderboard-dataset` vi
 [Artificial Analysis](https://artificialanalysis.ai/) evaluates models using **automated benchmark suites** — standardized tests with known correct answers, run programmatically.
 
 - **Score range**: 0–100 for aggregate indices; 0–1 for individual benchmarks
-- **Aggregate indices**: Intelligence Index (overall), Coding Index, Math Index
+- **Aggregate indices**: Intelligence Index (overall), Coding Index, Agentic Index
 - **Intelligence Index (v4.0)** aggregates scores from 10 evaluations: GPQA Diamond (science), Humanity's Last Exam (cross-domain), SciCode (scientific coding), Terminal-Bench Hard (CLI tasks), IFBench (instruction following), AA-LCR (long-context retrieval), AA-Omniscience (broad knowledge), GDPval-AA (quantitative reasoning), tau2-Bench Telecom (agent tasks), CritPt (critical thinking). See [AA's methodology](https://artificialanalysis.ai/methodology) for the current composition — AA may update this list over time.
-- **Individually tracked benchmarks** (7): model-eval tracks these as separate per-model scores: GPQA Diamond, Humanity's Last Exam, SciCode, LiveCodeBench, MMLU-Pro, MATH-500, AIME. Three of these (GPQA Diamond, HLE, SciCode) are also part of the Intelligence Index v4.0; the other four are independent benchmarks not included in the index.
 - **Strengths**: Precise for measurable capabilities; reproducible; covers specific skill areas
 - **Limitations**: Less reflective of subjective qualities like writing style or helpfulness
 
@@ -178,7 +177,7 @@ Each data source (Arena, AA) generates a histogram showing the full population s
 
 ### Composite Scores Table
 
-The main summary table shows all models' percentile scores grouped by category group (General Capabilities, Industry, Benchmarks), with provenance flags and the active Arena/AA weighting displayed in the header.
+The main summary table shows all models' percentile scores grouped by category group (General Capabilities, Industry), with provenance flags and the active Arena/AA weighting displayed in the header.
 
 ### Model Detail Cards
 
@@ -198,19 +197,18 @@ The Category Analysis section provides structured findings for each category, ra
 
 ## Category Taxonomy
 
-model-eval defines 34 unified categories across both sources:
+model-eval defines 28 unified categories across both sources:
 
 | Category Group | Count | Source | Examples |
 |---|---|---|---|
-| Composited (both sources) | 3 | Arena + AA | overall, coding, math |
-| General | 4 | Arena only | creative_writing, instruction_following, hard_prompts, expert |
+| Composited (both sources) | 3 | Arena + AA | overall, coding, agentic |
+| General | 5 | Arena only | math, creative_writing, instruction_following, hard_prompts, expert |
 | Interaction | 2 | Arena only | multi_turn, longer_query |
 | Industry | 8 | Arena only | software/IT, legal, science, math, writing, business/finance, entertainment, healthcare |
 | Language | 8 | Arena only | english, chinese, french, japanese, etc. |
 | Other Arena | 2 | Arena only | hard_prompts_english, exclude_ties |
-| AA Benchmarks | 7 | AA only | GPQA, HLE, SciCode, LiveCodeBench, MMLU-Pro, MATH-500, AIME |
 
-The default display shows 21 key categories. Use `--all-categories` to show all 34.
+The default display shows 15 key categories. Use `--all-categories` to show all 28.
 
 ## Variant Handling
 
@@ -232,7 +230,7 @@ These factors are from empirical measurements in llm-d-planner.
 
 When the resolver matches across variant boundaries (e.g., a reasoning or thinking model matched to a non-reasoning variant's scores, or an instruct model matched to a base variant), the system flags the mismatch descriptively but does **not** apply a numerical adjustment. The variant detection matches both "reasoning" and "thinking" keywords. The variant description appears in confidence indicators (see below).
 
-The codebase includes functions to compute empirical reasoning deltas from paired models (`compute_reasoning_deltas()`, `compute_arena_thinking_delta()` in `variants.py`), but these are not currently wired into the scoring pipeline.
+The `quality_scoring` package includes functions to compute empirical reasoning deltas from paired models (`compute_reasoning_deltas()`, `compute_arena_thinking_delta()` in `quality_scoring.variants`), but these are not currently wired into the scoring pipeline.
 
 ### Bidirectional Adjustments
 
@@ -289,7 +287,7 @@ model-eval scores -m "claude-opus-4-6,gemini-2.5-pro"
 # Custom Arena/AA weighting
 model-eval scores -m "model1,model2" --weights arena=60,aa=40
 
-# Show all 34 categories
+# Show all 28 categories
 model-eval scores -m "model1" --all-categories
 
 # Score all models from a catalog file
@@ -320,4 +318,11 @@ model-eval -m "model1,model2" --aa-data path/to/aa_data.json
 
 ## ScoringEngine API
 
-The `ScoringEngine` class in `engine.py` provides the primary programmatic API for external consumers (e.g., llm-d-planner). It pre-computes normalizations across the full population once, then supports cheap per-model lookups via `get_scores()` and `get_scores_batch()`. The CLI delegates to it internally.
+The `ScoringEngine` class is provided by the `quality_scoring` package from [llm-d-planner](https://pypi.org/project/llm-d-planner/). It pre-computes normalizations across the full population once, then supports cheap per-model lookups via `get_scores()` and `get_scores_batch()`. The model-eval CLI delegates to it internally.
+
+```python
+from quality_scoring import ScoringEngine
+
+engine = ScoringEngine(arena_rows=..., aa_models=..., categories=..., arena_weight=1, aa_weight=1)
+scorecard = engine.get_scores("model-name", fuzzy=True)
+```

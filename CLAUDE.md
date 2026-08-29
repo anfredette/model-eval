@@ -9,15 +9,15 @@ CLI tool for automated LLM model evaluation and comparison. Uses a provider patt
 - `src/model_eval/` — Main package (src layout)
   - `sources/` — Data source providers (arena.py, artificial_analysis.py)
   - `templates/` — Jinja2 report templates
-  - `aa_client.py` — Artificial Analysis API client and cache management
-  - `arena_client.py` — Arena leaderboard client and cache management
   - `charts.py` — Distribution chart generation (matplotlib histograms)
   - `cli.py` — Click CLI entry point (group with `sync-aa` and `sync-arena` subcommands)
-  - `models.py` — Core data models (stdlib dataclasses)
+  - `models.py` — Presentation data models (ComparisonResult, SourceData, etc.)
   - `renderer.py` — Report generation
-  - `resolver.py` — Model name resolution
-  - `tiers.py` — Tier classification and gap significance logic
 - `tests/` — Unit tests
+
+Scoring logic (ScoringEngine, resolver, tiers, categories, variants) and
+data clients (AA, Arena) are provided by the `quality_scoring` package from
+[llm-d-planner](https://pypi.org/project/llm-d-planner/).
 
 ## Development
 
@@ -41,7 +41,7 @@ make test       # pytest
 ## Conventions
 
 - Python 3.11+, ruff for linting/formatting, mypy for type checking
-- Pydantic v2 for data models
+- Pydantic v2 for source-layer models (AAModel)
 - Click for CLI
 - Jinja2 for report templates
 - All data sources implement the `DataSource` protocol in `sources/__init__.py`
