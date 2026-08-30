@@ -33,9 +33,9 @@ uv sync
 
 ### Data Sources
 
-Both data sources cache locally in `.model_cache/` inside the project directory.
-Caches auto-refresh if older than 24 hours, and auto-fetch if empty on first
-run.
+Both data sources cache locally in `.model_cache/` in the current working
+directory (override with `MODEL_EVAL_CACHE_DIR` env var). Caches auto-refresh
+if older than 24 hours, and auto-fetch if empty on first run.
 
 **Arena** (no setup needed): Data is fetched from HuggingFace automatically.
 

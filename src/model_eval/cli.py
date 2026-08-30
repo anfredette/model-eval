@@ -11,15 +11,21 @@ from pathlib import Path
 from typing import Any
 
 import click
+from quality_scoring import (
+    MatchType,
+    ModelScorecard,
+    ScoringEngine,
+    aa_client,
+    arena_client,
+    suggest_similar,
+)
 
 import model_eval.sources.arena  # noqa: F401
 import model_eval.sources.artificial_analysis  # noqa: F401
-from model_eval import aa_client, arena_client
+from model_eval import CACHE_DIR
 from model_eval.charts import generate_composite_chart, generate_distribution_chart
-from model_eval.engine import ScoringEngine
-from model_eval.models import ComparisonResult, MatchType, ModelScorecard
+from model_eval.models import ComparisonResult
 from model_eval.renderer import render_comparison
-from model_eval.resolver import suggest_similar
 from model_eval.sources import get_available_sources, get_source
 
 REPORTS_DIR = Path("reports")
@@ -142,7 +148,7 @@ def build_scorecards(
         arena_weight=arena_weight,
         aa_weight=aa_weight,
     )
-    return engine.get_scores_batch(model_names, fuzzy=fuzzy)
+    return engine.get_scores_batch(model_names, fuzzy=fuzzy)  # type: ignore[no-any-return]
 
 
 @click.group(invoke_without_command=True)
@@ -268,7 +274,7 @@ def main(
         loader = dist_loaders.get(source_data.source_name)
         if not loader or not source_data.chart_models:
             continue
-        dist_cache = loader()
+        dist_cache = loader(cache_dir=CACHE_DIR)
         if not dist_cache or "scores" not in dist_cache:
             continue
         stats = dist_cache.get("stats", {})
@@ -284,11 +290,10 @@ def main(
         source_data.chart_path = Path(chart_path.name)
         click.echo(f"Chart written to {chart_path}")
 
-    from model_eval.categories import DEFAULT_CATEGORIES
-    from model_eval.scoring import generate_category_findings
+    from quality_scoring import DEFAULT_CATEGORIES, generate_category_findings
 
-    arena_rows_raw, _ = arena_client.load_cache()
-    aa_models_raw, _ = aa_client.load_cache()
+    arena_rows_raw, _ = arena_client.load_cache(cache_dir=CACHE_DIR)
+    aa_models_raw, _ = aa_client.load_cache(cache_dir=CACHE_DIR)
 
     if arena_rows_raw or aa_models_raw:
         scorecards = build_scorecards(
@@ -362,8 +367,6 @@ def main(
 @click.option("--verbose", "-v", is_flag=True, help="Verbose output.")
 def sync_aa(api_key: str, verbose: bool) -> None:
     """Sync Artificial Analysis model data from the API."""
-    from model_eval import aa_client
-
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
         format="%(levelname)s: %(message)s",
@@ -371,7 +374,7 @@ def sync_aa(api_key: str, verbose: bool) -> None:
 
     click.echo("Fetching models from Artificial Analysis API...")
     try:
-        count, cache_path = aa_client.sync(api_key)
+        count, cache_path = aa_client.sync(api_key, cache_dir=CACHE_DIR)
     except RuntimeError as e:
         raise click.ClickException(str(e)) from e
 
@@ -382,8 +385,6 @@ def sync_aa(api_key: str, verbose: bool) -> None:
 @click.option("--verbose", "-v", is_flag=True, help="Verbose output.")
 def sync_arena(verbose: bool) -> None:
     """Sync Arena leaderboard data from HuggingFace."""
-    from model_eval import arena_client
-
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
         format="%(levelname)s: %(message)s",
@@ -391,7 +392,7 @@ def sync_arena(verbose: bool) -> None:
 
     click.echo("Fetching Arena leaderboard from HuggingFace...")
     try:
-        count, cache_path = arena_client.sync()
+        count, cache_path = arena_client.sync(cache_dir=CACHE_DIR)
     except Exception as e:
         raise click.ClickException(str(e)) from e
 
@@ -439,11 +440,9 @@ def scores_command(
     verbose: bool,
 ) -> None:
     """Show normalized and composite scores for models across sources."""
+    from quality_scoring import ALL_CATEGORIES, DEFAULT_CATEGORIES, NormalizedScore, display_name
     from rich.console import Console
     from rich.table import Table
-
-    from model_eval.categories import ALL_CATEGORIES, DEFAULT_CATEGORIES, display_name
-    from model_eval.models import NormalizedScore
 
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
@@ -454,8 +453,8 @@ def scores_command(
 
     arena_weight, aa_weight = parse_weights(weights)
 
-    arena_rows, arena_fetched = arena_client.load_cache()
-    aa_models, aa_fetched = aa_client.load_cache()
+    arena_rows, arena_fetched = arena_client.load_cache(cache_dir=CACHE_DIR)
+    aa_models, aa_fetched = aa_client.load_cache(cache_dir=CACHE_DIR)
 
     if not arena_rows and not aa_models:
         raise click.ClickException(

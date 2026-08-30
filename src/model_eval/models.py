@@ -1,19 +1,34 @@
 from __future__ import annotations
 
-import enum
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from quality_scoring import (
+    CategoryFinding,
+    CompositeScore,
+    MatchType,
+    ModelScorecard,
+    NormalizedScore,
+)
+
 if TYPE_CHECKING:
-    from model_eval.resolver import MatchResult
+    from quality_scoring.resolver import MatchResult
 
-
-class MatchType(enum.Enum):
-    EXACT = "exact"
-    EQUIVALENT = "equivalent"
-    FUZZY = "fuzzy"
-    NONE = "none"
+__all__ = [
+    "CategoryFinding",
+    "ComparisonResult",
+    "ComparisonTable",
+    "CompositeScore",
+    "DistributionStats",
+    "HeadToHead",
+    "MatchType",
+    "ModelScorecard",
+    "NormalizedScore",
+    "RankEntry",
+    "ResolutionReport",
+    "SourceData",
+]
 
 
 @dataclass
@@ -106,65 +121,3 @@ class ComparisonResult:
     arena_weight: float = 0.5
     aa_weight: float = 0.5
     composite_chart_path: Path | None = None
-
-
-@dataclass
-class NormalizedScore:
-    """A model's normalized score in a single category from a single source."""
-
-    raw_score: float
-    percentile: float
-    tied_rank: int
-    population_size: int
-    source: str
-    confidence: float = 1.0
-    adjustment: str | None = None
-
-
-@dataclass
-class CompositeScore:
-    """A model's composite score in a single category."""
-
-    category: str
-    percentile: float
-    arena_score: NormalizedScore | None
-    aa_score: NormalizedScore | None
-
-    @property
-    def provenance(self) -> str:
-        if self.arena_score and self.aa_score:
-            return "both"
-        if self.arena_score:
-            return "arena_only"
-        if self.aa_score:
-            return "aa_only"
-        return "none"
-
-
-@dataclass
-class ModelScorecard:
-    """Complete scoring profile for a single model."""
-
-    model_name: str
-    arena_name: str | None
-    aa_name: str | None
-    arena_match_type: MatchType | None = None
-    aa_match_type: MatchType | None = None
-    overall: CompositeScore | None = None
-    categories: dict[str, CompositeScore] = field(default_factory=dict)
-
-
-@dataclass
-class CategoryFinding:
-    """Structured per-category finding for template rendering.
-
-    ranked_models is sorted descending by percentile — all models
-    with data in this category, not just the top and bottom.
-    """
-
-    category: str
-    display_name: str
-    ranked_models: list[tuple[str, float]]
-    gap_description: str
-    provenance: str
-    variant_notes: list[str] = field(default_factory=list)
