@@ -53,6 +53,11 @@ When the user asks to evaluate or compare models:
       6. **Bottom line** — 2-3 sentences using percentile language
       - Write the conclusions using the actual data from the report — cite specific composite percentiles, category scores, and tier placements
 
+   **Accuracy checks** (apply when writing analysis in steps a–c):
+   - **Top/weakest category:** When populating the summary table, scan ALL composite percentile values for each model (including Industry categories) to find the actual highest and lowest. Do not eyeball — compare numerically. Exclude "Overall" from top/weakest.
+   - **Variant data cross-referencing:** A model may show data in the AA "All Models" table (which displays the matched variant) that is absent from the composite/detail cards (which use the variant-adjusted baseline). Before claiming a model "has no data" for a category, check the AA table — if the matched variant has data but the composite excludes it, say so explicitly (e.g., "Gemma's reasoning variant has an AA Agentic score of 11, but the non-reasoning baseline used for compositing lacks this data").
+   - **Arithmetic:** Double-check any computed deltas (e.g., "exceeds by 30+ points") against the actual numbers in the tables before writing them.
+
 7. **Generate PDF if the user requested it** (do not ask for permission — just generate it):
    - Run pandoc AFTER all analysis has been added to the markdown file
    - `pandoc <report>.md -o <report>.pdf --pdf-engine=xelatex -V geometry:margin=1in -V fontsize=10pt`

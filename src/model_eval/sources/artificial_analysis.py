@@ -26,19 +26,13 @@ logger = logging.getLogger(__name__)
 METHODOLOGY = """\
 [Artificial Analysis](https://artificialanalysis.ai/) evaluates models using \
 **automated benchmark suites** -- standardized tests with known correct answers, \
-run programmatically. Their Intelligence Index (v4.0) aggregates scores from 10 \
-evaluations:
+run programmatically. Their Intelligence Index (v4.1.1) aggregates scores from 9 \
+evaluations across four categories:
 
-- **GPQA Diamond** -- graduate-level science questions
-- **Humanity's Last Exam (HLE)** -- extremely difficult cross-domain questions
-- **SciCode** -- scientific coding problems
-- **Terminal-Bench Hard** -- complex terminal/CLI tasks
-- **IFBench** -- instruction following
-- **AA-LCR** -- long-context retrieval
-- **AA-Omniscience** -- broad knowledge assessment
-- **GDPval-AA** -- GDP prediction (quantitative reasoning)
-- **tau2-Bench Telecom** -- domain-specific agent tasks
-- **CritPt** -- critical thinking
+- **Scientific Reasoning (24%):** GPQA Diamond, Humanity's Last Exam (HLE), CritPt
+- **Coding (24%):** Terminal-Bench v2.1, SciCode
+- **Agents (34%):** GDPval-AA v2, τ³-Banking
+- **General (18%):** AA-LCR, AA-Omniscience
 
 Unlike Arena's human preference votes, these benchmarks have **objectively \
 correct answers**. This makes AA scores more precise for measurable capabilities \

@@ -78,7 +78,7 @@ chess) -- higher is better, with scores typically ranging from ~900 to ~1550.
 The `text_style_control` variant adjusts for verbosity bias, so models don't get \
 rewarded simply for producing longer responses.
 
-Ratings are broken down into **27 topic-based categories** (coding, math, \
+Ratings are broken down into **29 topic-based categories** (coding, math, \
 creative writing, legal, etc.) based on conversation content, giving a detailed \
 profile of where each model excels relative to the full field. Because these are \
 human judgments rather than automated test suites, they reflect what real users \
@@ -340,6 +340,9 @@ def _head_to_head(
 
 
 def _win_loss_table(h2hs: list[HeadToHead]) -> ComparisonTable:
+    model_as = {h.model_a for h in h2hs}
+    multi_model = len(model_as) > 1
+
     rows: list[list[str]] = []
     for h in sorted(h2hs, key=lambda h: h.deltas[0] if h.deltas else 0, reverse=True):
         overall_delta = next(
@@ -347,20 +350,25 @@ def _win_loss_table(h2hs: list[HeadToHead]) -> ComparisonTable:
             0.0,
         )
         gap_str = f"+{overall_delta:.1f}" if overall_delta > 0 else f"{overall_delta:.1f}"
-        rows.append(
-            [
-                h.model_b,
-                str(h.a_wins),
-                str(h.b_wins),
-                gap_str,
-            ]
+        row = (
+            [h.model_a, h.model_b, str(h.a_wins), str(h.b_wins), gap_str]
+            if multi_model
+            else [h.model_b, str(h.a_wins), str(h.b_wins), gap_str]
         )
+        rows.append(row)
+
+    if multi_model:
+        headers = ["Model", "vs Model", "Wins", "Opponent Wins", "Overall Gap"]
+        alignments = ["left", "left", "center", "center", "center"]
+    else:
+        headers = ["vs Model", f"{h2hs[0].model_a} Wins", "Opponent Wins", "Overall Gap"]
+        alignments = ["left", "center", "center", "center"]
 
     return ComparisonTable(
         title="Win/Loss Summary",
-        headers=["vs Model", f"{h2hs[0].model_a} Wins", "Opponent Wins", "Overall Gap"],
+        headers=headers,
         rows=rows,
-        alignments=["left", "center", "center", "center"],
+        alignments=alignments,
     )
 
 
